@@ -1,0 +1,14 @@
+name: dnaenv
+channels:
+  - conda-forge
+dependencies:
+  - python=3.11
+  - pandas
+  - pyarrow
+  - duckdb
+  - jupyterlab
+  - ipykernel
+  - tqdm
+  - pip
+  - pip:
+      - nbformat

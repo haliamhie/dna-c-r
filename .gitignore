@@ -1,0 +1,73 @@
+# Data files - DO NOT COMMIT
+DNA-Data for Telhai/
+*.csv
+*.7z
+*.7z.*
+*.parquet
+*.duckdb
+*.duckdb.wal
+
+# Artifacts and outputs
+artifacts/
+scratch/
+logs/
+
+# Jupyter
+.ipynb_checkpoints/
+*.ipynb_checkpoints
+*/.ipynb_checkpoints/*
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Conda
+*.egg-info/
+dist/
+build/
+
+# Claude Code config files
+.claude/
+claude.json
+.claude.json
+CLAUDE.md
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+
+# Temporary files
+*.tmp
+*.temp
+*.log
+*.pid
+*.seed
+*.pid.lock
+
+# OS files
+Thumbs.db
+ehthumbs.db
+Desktop.ini
+$RECYCLE.BIN/
+*.cab
+*.msi
+*.msm
+*.msp
+*.lnk
