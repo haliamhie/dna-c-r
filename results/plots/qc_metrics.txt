@@ -1,0 +1,41 @@
+{
+  "summary": {
+    "total_reads": 7071847,
+    "valid_barcodes": "4450",
+    "failed_barcodes": "5550",
+    "failure_rate": 0.5546460493277074,
+    "matches_expected_failure": "True"
+  },
+  "failure_diagnosis": {
+    "synthesis_errors": 0,
+    "pcr_amplification_bias": 0.16876404494382022,
+    "insufficient_phix": 0,
+    "contamination": 0,
+    "rna_degradation": 0.1,
+    "cell_segmentation_errors": 0.05,
+    "low_complexity_regions": 0,
+    "adapter_dimers": 0
+  },
+  "coverage_statistics": {
+    "mean_coverage": 1.2405910231391135,
+    "median_coverage": 1.0,
+    "std_coverage": 0.5095601089258962,
+    "cv_coverage": 0.4107398001611662,
+    "min_coverage": 1,
+    "max_coverage": 4,
+    "zero_coverage_barcodes": 0,
+    "low_coverage_barcodes": 3587,
+    "high_coverage_barcodes": 0,
+    "gini_coefficient": 0.15908082557800807,
+    "sufficient_for_statistics": "False",
+    "matches_ops_pattern": "False"
+  },
+  "contamination_check": {
+    "unexpected_barcodes": 0,
+    "contamination_rate": 0.0,
+    "potential_sources": [],
+    "adapter_contamination": 0,
+    "primer_contamination": 0
+  },
+  "recommendations": []
+}
