@@ -1,0 +1,14 @@
+CRISPR Pipeline Analysis Summary
+==================================================
+Date: 2025-08-13 16:13:53
+Runtime: 0.1 seconds
+
+Data:
+  Total reads: 1,000
+  Unique barcodes: 3
+
+Quality Control:
+  Failure rate: 55.0%
+
+Screening Results:
+  Hit candidates: 0

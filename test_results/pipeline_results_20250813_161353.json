@@ -1,0 +1,301 @@
+{
+  "data_summary": {
+    "cluster_file": "/home/mch/dna/test_data/test_clusters.csv",
+    "design_file": "/home/mch/dna/test_data/test_design.csv",
+    "total_reads": 1000,
+    "unique_barcodes": 3,
+    "design_barcodes": 3
+  },
+  "quality_control": {
+    "summary": {
+      "total_reads": 1000,
+      "valid_barcodes": "450",
+      "failed_barcodes": "550",
+      "failure_rate": 0.55,
+      "matches_expected_failure": "True"
+    },
+    "failure_diagnosis": {
+      "synthesis_errors": 0,
+      "pcr_amplification_bias": 0.0,
+      "insufficient_phix": 0.953125,
+      "contamination": 0,
+      "rna_degradation": 0.1,
+      "cell_segmentation_errors": 0.05,
+      "low_complexity_regions": 0,
+      "adapter_dimers": 0
+    },
+    "coverage_statistics": {
+      "mean_coverage": 150.0,
+      "median_coverage": 150.0,
+      "std_coverage": 40.824829046386306,
+      "cv_coverage": 0.2721655269759087,
+      "min_coverage": 100,
+      "max_coverage": 200,
+      "zero_coverage_barcodes": 0,
+      "low_coverage_barcodes": 0,
+      "high_coverage_barcodes": 0,
+      "gini_coefficient": 0.14814814814814814,
+      "sufficient_for_statistics": "True",
+      "matches_ops_pattern": "False"
+    },
+    "contamination_check": {
+      "unexpected_barcodes": 0,
+      "contamination_rate": 0.0,
+      "potential_sources": [],
+      "adapter_contamination": 0,
+      "primer_contamination": 0
+    },
+    "recommendations": [
+      "Low complexity: Increase PhiX spike-in to 10-20%"
+    ]
+  },
+  "error_correction": {
+    "corrected_count": 0,
+    "total_barcodes": 450,
+    "correction_rate": 0.0
+  },
+  "crispr_analysis": {
+    "loss_of_function_rate": 0.0,
+    "start_codons": 0,
+    "stop_codons": 0
+  },
+  "clustering": {
+    "total_reads": 1000,
+    "reads_with_barcodes": "450",
+    "unique_barcodes": 3,
+    "unique_cells": 100,
+    "cell_reconstruction": {
+      "total_cells": 100,
+      "cells_with_barcodes": 100,
+      "unique_barcodes_per_cell": {
+        "cell_0": 3,
+        "cell_1": 3,
+        "cell_2": 3,
+        "cell_3": 3,
+        "cell_4": 3,
+        "cell_5": 3,
+        "cell_6": 3,
+        "cell_7": 3,
+        "cell_8": 3,
+        "cell_9": 3,
+        "cell_10": 3,
+        "cell_11": 3,
+        "cell_12": 3,
+        "cell_13": 3,
+        "cell_14": 3,
+        "cell_15": 3,
+        "cell_16": 3,
+        "cell_17": 3,
+        "cell_18": 3,
+        "cell_19": 3,
+        "cell_20": 3,
+        "cell_21": 3,
+        "cell_22": 3,
+        "cell_23": 3,
+        "cell_24": 3,
+        "cell_25": 3,
+        "cell_26": 3,
+        "cell_27": 3,
+        "cell_28": 3,
+        "cell_29": 3,
+        "cell_30": 3,
+        "cell_31": 3,
+        "cell_32": 3,
+        "cell_33": 3,
+        "cell_34": 3,
+        "cell_35": 3,
+        "cell_36": 3,
+        "cell_37": 3,
+        "cell_38": 3,
+        "cell_39": 3,
+        "cell_40": 3,
+        "cell_41": 3,
+        "cell_42": 3,
+        "cell_43": 3,
+        "cell_44": 3,
+        "cell_45": 3,
+        "cell_46": 3,
+        "cell_47": 3,
+        "cell_48": 3,
+        "cell_49": 3,
+        "cell_50": 3,
+        "cell_51": 3,
+        "cell_52": 3,
+        "cell_53": 3,
+        "cell_54": 3,
+        "cell_55": 3,
+        "cell_56": 3,
+        "cell_57": 3,
+        "cell_58": 3,
+        "cell_59": 3,
+        "cell_60": 3,
+        "cell_61": 3,
+        "cell_62": 3,
+        "cell_63": 3,
+        "cell_64": 3,
+        "cell_65": 3,
+        "cell_66": 3,
+        "cell_67": 3,
+        "cell_68": 3,
+        "cell_69": 3,
+        "cell_70": 3,
+        "cell_71": 3,
+        "cell_72": 3,
+        "cell_73": 3,
+        "cell_74": 3,
+        "cell_75": 3,
+        "cell_76": 3,
+        "cell_77": 3,
+        "cell_78": 3,
+        "cell_79": 3,
+        "cell_80": 3,
+        "cell_81": 3,
+        "cell_82": 3,
+        "cell_83": 3,
+        "cell_84": 3,
+        "cell_85": 3,
+        "cell_86": 3,
+        "cell_87": 3,
+        "cell_88": 3,
+        "cell_89": 3,
+        "cell_90": 3,
+        "cell_91": 3,
+        "cell_92": 3,
+        "cell_93": 3,
+        "cell_94": 3,
+        "cell_95": 3,
+        "cell_96": 3,
+        "cell_97": 3,
+        "cell_98": 3,
+        "cell_99": 3
+      },
+      "multi_barcode_cells": 100
+    },
+    "phenotype_clusters": {
+      "enriched_barcodes": {},
+      "depleted_barcodes": {},
+      "mean_barcode_count": 150.0,
+      "std_barcode_count": 40.824829046386306
+    },
+    "spatial_patterns": {
+      "dispersion_index": {
+        "ACGTACGTACGTAC": 200,
+        "TGCATGCATGCATG": 150,
+        "GCTAGCTAGCTAGC": 100
+      },
+      "clustering_coefficient": {},
+      "coverage": {
+        "ACGTACGTACGTAC": 0.2,
+        "TGCATGCATGCATG": 0.15,
+        "GCTAGCTAGCTAGC": 0.1
+      }
+    },
+    "contamination_analysis": {
+      "total_cells": 100,
+      "single_barcode_cells": 0,
+      "multi_barcode_cells": 100,
+      "contamination_rate": 1.0,
+      "expected_contamination": 0.09999999999999998,
+      "contamination_detected": true,
+      "sample_multi_cells": [
+        {
+          "cell_id": "cell_0",
+          "n_barcodes": 3,
+          "barcodes": [
+            "GCTAGCTAGCTAGC",
+            "TGCATGCATGCATG",
+            "ACGTACGTACGTAC"
+          ]
+        },
+        {
+          "cell_id": "cell_1",
+          "n_barcodes": 3,
+          "barcodes": [
+            "GCTAGCTAGCTAGC",
+            "TGCATGCATGCATG",
+            "ACGTACGTACGTAC"
+          ]
+        },
+        {
+          "cell_id": "cell_2",
+          "n_barcodes": 3,
+          "barcodes": [
+            "GCTAGCTAGCTAGC",
+            "TGCATGCATGCATG",
+            "ACGTACGTACGTAC"
+          ]
+        },
+        {
+          "cell_id": "cell_3",
+          "n_barcodes": 3,
+          "barcodes": [
+            "GCTAGCTAGCTAGC",
+            "TGCATGCATGCATG",
+            "ACGTACGTACGTAC"
+          ]
+        },
+        {
+          "cell_id": "cell_4",
+          "n_barcodes": 3,
+          "barcodes": [
+            "GCTAGCTAGCTAGC",
+            "TGCATGCATGCATG",
+            "ACGTACGTACGTAC"
+          ]
+        },
+        {
+          "cell_id": "cell_5",
+          "n_barcodes": 3,
+          "barcodes": [
+            "GCTAGCTAGCTAGC",
+            "TGCATGCATGCATG",
+            "ACGTACGTACGTAC"
+          ]
+        },
+        {
+          "cell_id": "cell_6",
+          "n_barcodes": 3,
+          "barcodes": [
+            "GCTAGCTAGCTAGC",
+            "TGCATGCATGCATG",
+            "ACGTACGTACGTAC"
+          ]
+        },
+        {
+          "cell_id": "cell_7",
+          "n_barcodes": 3,
+          "barcodes": [
+            "GCTAGCTAGCTAGC",
+            "TGCATGCATGCATG",
+            "ACGTACGTACGTAC"
+          ]
+        },
+        {
+          "cell_id": "cell_8",
+          "n_barcodes": 3,
+          "barcodes": [
+            "GCTAGCTAGCTAGC",
+            "TGCATGCATGCATG",
+            "ACGTACGTACGTAC"
+          ]
+        },
+        {
+          "cell_id": "cell_9",
+          "n_barcodes": 3,
+          "barcodes": [
+            "GCTAGCTAGCTAGC",
+            "TGCATGCATGCATG",
+            "ACGTACGTACGTAC"
+          ]
+        }
+      ]
+    },
+    "quality_metrics": {
+      "barcode_assignment_rate": 0.45,
+      "reads_per_barcode": 150.0,
+      "cells_per_barcode": 33.333333333333336
+    }
+  },
+  "hit_candidates": [],
+  "runtime_seconds": 0.051646
+}
