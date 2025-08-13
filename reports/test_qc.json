@@ -1,0 +1,18 @@
+{
+  "summary": {
+    "total_reads": 10000,
+    "valid_barcodes": 4500,
+    "failed_barcodes": 5500,
+    "failure_rate": 0.55
+  },
+  "failure_diagnosis": {
+    "pcr_amplification_bias": 0.17,
+    "rna_degradation": 0.1,
+    "cell_segmentation_errors": 0.05
+  },
+  "coverage_statistics": {
+    "mean_coverage": 315,
+    "median_coverage": 280,
+    "std_coverage": 120
+  }
+}
