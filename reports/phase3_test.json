@@ -1,0 +1,72 @@
+{
+  "metadata": {
+    "timestamp": "2025-08-13T11:49:56.922470",
+    "experiment_type": "Optical Pooled CRISPR Screening",
+    "methodology": "CRISPRmap",
+    "institution": "Tel-Hai College",
+    "experiment_date": "2023-05-11"
+  },
+  "sequencing": {
+    "platform": "MiSeq",
+    "read_length": 150,
+    "paired_end": true,
+    "total_reads": 7000000,
+    "quality_scores": {
+      "Q30": 0.92
+    },
+    "adapter_contamination": 0
+  },
+  "library": {
+    "total_barcodes": 10000,
+    "barcode_length": 14,
+    "payload_length": 96,
+    "hamming_distance": 4,
+    "coverage_target": 315,
+    "actual_coverage": {
+      "mean": 315,
+      "std": 120
+    }
+  },
+  "quality_control": {
+    "success_rate": 0.44499999999999995,
+    "failure_causes": {
+      "pcr_amplification_bias": 0.17,
+      "rna_degradation": 0.1
+    },
+    "coverage_uniformity": {},
+    "recommendations": [
+      "Optimize PCR conditions",
+      "Improve RNA handling"
+    ]
+  },
+  "error_correction": {
+    "sequences_corrected": 2500000,
+    "consensus_sequences": 0,
+    "uncorrectable": 0,
+    "correction_rate": 0.357
+  },
+  "screening": {
+    "loss_of_function": 0.82,
+    "start_codons": 8200,
+    "stop_codons": 8400,
+    "frameshifts": 1200,
+    "saturation": 0,
+    "hit_candidates": [
+      "gene1",
+      "gene2",
+      "gene3"
+    ]
+  },
+  "summary": {
+    "experiment_type": "Optical Pooled CRISPR Screening",
+    "timestamp": "2025-08-13T11:49:56.922470",
+    "key_metrics": {
+      "total_barcodes": 10000,
+      "success_rate": "44.5%",
+      "main_failure_cause": "pcr_amplification_bias",
+      "loss_of_function": "82.0%",
+      "hit_candidates": 3,
+      "correction_rate": "35.7%"
+    }
+  }
+}
