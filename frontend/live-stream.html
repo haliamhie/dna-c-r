@@ -1,0 +1,791 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRISPR ML Live Stream Analysis</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #000000, #0a0a0a);
+            color: #e0e0e0;
+            overflow: hidden;
+            height: 100vh;
+        }
+        
+        .container {
+            display: grid;
+            grid-template-rows: 60px 1fr;
+            height: 100vh;
+        }
+        
+        .header {
+            background: rgba(10, 10, 10, 0.95);
+            border-bottom: 1px solid #1a1a1a;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            padding: 0 30px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .title {
+            font-size: 20px;
+            font-weight: 300;
+            letter-spacing: 2px;
+            color: #fff;
+        }
+        
+        .status {
+            display: flex;
+            align-items: center;
+            gap: 20px;
+        }
+        
+        .status-item {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+        
+        .status-light {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #4caf50;
+            animation: pulse 2s ease infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; box-shadow: 0 0 10px currentColor; }
+            50% { opacity: 0.5; }
+        }
+        
+        .main-grid {
+            display: grid;
+            grid-template-columns: 300px 1fr 350px;
+            gap: 1px;
+            background: #1a1a1a;
+            height: calc(100vh - 60px);
+        }
+        
+        .panel {
+            background: #0a0a0a;
+            overflow: hidden;
+            position: relative;
+        }
+        
+        /* Sequence Stream */
+        .sequence-stream {
+            overflow-y: auto;
+            padding: 20px;
+        }
+        
+        .sequence-item {
+            background: #0f0f0f;
+            border: 1px solid #1a1a1a;
+            border-radius: 4px;
+            padding: 12px;
+            margin-bottom: 10px;
+            animation: slideIn 0.3s ease;
+            transition: all 0.3s ease;
+        }
+        
+        @keyframes slideIn {
+            from {
+                transform: translateX(-100%);
+                opacity: 0;
+            }
+            to {
+                transform: translateX(0);
+                opacity: 1;
+            }
+        }
+        
+        .sequence-item.processing {
+            border-color: #4caf50;
+            background: linear-gradient(135deg, rgba(76, 175, 80, 0.05), transparent);
+            box-shadow: 0 0 20px rgba(76, 175, 80, 0.2);
+        }
+        
+        .sequence-text {
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+        }
+        
+        .base-A { color: #e57373; }
+        .base-T { color: #64b5f6; }
+        .base-G { color: #fff59d; }
+        .base-C { color: #81c784; }
+        
+        .sequence-meta {
+            display: flex;
+            gap: 15px;
+            font-size: 10px;
+            color: #666;
+        }
+        
+        /* Center Visualization */
+        .viz-container {
+            display: grid;
+            grid-template-rows: 1fr 1fr 200px;
+            gap: 1px;
+            background: #1a1a1a;
+        }
+        
+        .chart-panel {
+            background: #0a0a0a;
+            padding: 20px;
+            position: relative;
+        }
+        
+        .chart-title {
+            font-size: 12px;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 15px;
+        }
+        
+        /* Model Grid */
+        .model-grid {
+            display: grid;
+            grid-template-columns: repeat(5, 1fr);
+            gap: 10px;
+            padding: 20px;
+            background: #0a0a0a;
+        }
+        
+        .model-cell {
+            background: #0f0f0f;
+            border: 1px solid #1a1a1a;
+            border-radius: 4px;
+            padding: 10px;
+            text-align: center;
+            transition: all 0.3s ease;
+        }
+        
+        .model-cell.active {
+            border-color: #4caf50;
+            transform: scale(1.05);
+        }
+        
+        .model-name {
+            font-size: 9px;
+            color: #666;
+            margin-bottom: 5px;
+            text-transform: uppercase;
+        }
+        
+        .model-prediction {
+            font-size: 10px;
+            padding: 4px;
+            border-radius: 2px;
+            margin-bottom: 5px;
+        }
+        
+        .highly-enriched { background: rgba(229, 115, 115, 0.2); color: #e57373; }
+        .enriched { background: rgba(255, 183, 77, 0.2); color: #ffb74d; }
+        .neutral { background: rgba(189, 189, 189, 0.2); color: #bdbdbd; }
+        .depleted { background: rgba(100, 181, 246, 0.2); color: #64b5f6; }
+        .highly-depleted { background: rgba(63, 81, 181, 0.2); color: #5c6bc0; }
+        
+        .model-confidence {
+            font-size: 9px;
+            color: #999;
+        }
+        
+        /* Performance Metrics */
+        .metrics-panel {
+            padding: 20px;
+            overflow-y: auto;
+        }
+        
+        .metric-card {
+            background: #0f0f0f;
+            border: 1px solid #1a1a1a;
+            border-radius: 6px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .metric-label {
+            font-size: 10px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        
+        .metric-value {
+            font-size: 24px;
+            font-weight: 300;
+            color: #fff;
+        }
+        
+        .metric-unit {
+            font-size: 11px;
+            color: #666;
+            margin-left: 4px;
+        }
+        
+        .metric-change {
+            font-size: 10px;
+            margin-top: 5px;
+        }
+        
+        .metric-up { color: #4caf50; }
+        .metric-down { color: #f44336; }
+        
+        /* Heatmap */
+        .heatmap {
+            display: grid;
+            grid-template-columns: repeat(10, 1fr);
+            gap: 2px;
+            padding: 10px;
+        }
+        
+        .heat-cell {
+            aspect-ratio: 1;
+            border-radius: 2px;
+            transition: all 0.3s ease;
+        }
+        
+        /* Controls */
+        .controls {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            display: flex;
+            gap: 10px;
+            z-index: 100;
+        }
+        
+        button {
+            padding: 8px 16px;
+            background: #141414;
+            border: 1px solid #2a2a2a;
+            color: #888;
+            border-radius: 4px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        button:hover {
+            background: #1a1a1a;
+            color: #fff;
+            border-color: #333;
+        }
+        
+        button.active {
+            background: #4caf50;
+            color: #fff;
+            border-color: #4caf50;
+        }
+        
+        /* Loading Animation */
+        .loader {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            display: none;
+        }
+        
+        .loader.active {
+            display: block;
+        }
+        
+        .loader-ring {
+            width: 60px;
+            height: 60px;
+            border: 3px solid #1a1a1a;
+            border-top: 3px solid #4caf50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Difference Visualization */
+        .diff-indicator {
+            width: 100%;
+            height: 4px;
+            background: #1a1a1a;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 5px;
+        }
+        
+        .diff-bar {
+            height: 100%;
+            transition: width 0.3s ease;
+        }
+        
+        .agreement-high { background: #4caf50; }
+        .agreement-medium { background: #ff9800; }
+        .agreement-low { background: #f44336; }
+        
+        /* Streaming indicator */
+        .stream-indicator {
+            position: absolute;
+            top: 10px;
+            right: 10px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            font-size: 10px;
+            color: #666;
+        }
+        
+        .stream-dot {
+            width: 6px;
+            height: 6px;
+            background: #4caf50;
+            border-radius: 50%;
+            animation: streamPulse 1s ease infinite;
+        }
+        
+        @keyframes streamPulse {
+            0%, 100% { transform: scale(1); opacity: 1; }
+            50% { transform: scale(1.5); opacity: 0.5; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <div class="title">CRISPR ML LIVE STREAM</div>
+            <div class="status">
+                <div class="status-item">
+                    <div class="status-light"></div>
+                    <span id="stream-status">STREAMING</span>
+                </div>
+                <div class="status-item">
+                    <span>Sequences/sec:</span>
+                    <span id="rate">0</span>
+                </div>
+                <div class="status-item">
+                    <span>Total Processed:</span>
+                    <span id="total">0</span>
+                </div>
+                <div class="status-item">
+                    <button id="pause-btn" onclick="toggleStream()">PAUSE</button>
+                    <button onclick="changeSpeed()">SPEED: 2s</button>
+                </div>
+            </div>
+        </div>
+        
+        <div class="main-grid">
+            <!-- Left: Sequence Stream -->
+            <div class="panel sequence-stream" id="sequence-stream">
+                <div class="stream-indicator">
+                    <div class="stream-dot"></div>
+                    <span>LIVE</span>
+                </div>
+            </div>
+            
+            <!-- Center: Visualizations -->
+            <div class="panel viz-container">
+                <!-- Consensus Chart -->
+                <div class="chart-panel">
+                    <div class="chart-title">Model Agreement Over Time</div>
+                    <canvas id="agreement-chart"></canvas>
+                </div>
+                
+                <!-- Classification Distribution -->
+                <div class="chart-panel">
+                    <div class="chart-title">Classification Distribution</div>
+                    <canvas id="distribution-chart"></canvas>
+                </div>
+                
+                <!-- Model Grid -->
+                <div class="model-grid" id="model-grid">
+                    <!-- Populated dynamically -->
+                </div>
+            </div>
+            
+            <!-- Right: Metrics -->
+            <div class="panel metrics-panel">
+                <div class="metric-card">
+                    <div class="metric-label">Consensus Score</div>
+                    <div class="metric-value" id="consensus-score">0<span class="metric-unit">%</span></div>
+                    <div class="metric-change" id="consensus-change">-</div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-label">Model Agreement</div>
+                    <div class="metric-value" id="agreement">0<span class="metric-unit">/10</span></div>
+                    <div class="diff-indicator">
+                        <div class="diff-bar" id="agreement-bar" style="width: 0%"></div>
+                    </div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-label">Avg Processing Time</div>
+                    <div class="metric-value" id="avg-time">0<span class="metric-unit">ms</span></div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-label">Classification Breakdown</div>
+                    <div class="heatmap" id="class-heatmap"></div>
+                </div>
+                
+                <div class="metric-card">
+                    <div class="metric-label">Best Model</div>
+                    <div class="metric-value" id="best-model" style="font-size: 14px;">-</div>
+                </div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_URL = 'http://localhost:8000';
+        let isStreaming = true;
+        let streamInterval = 2000; // 2 seconds
+        let sequences = [];
+        let currentIndex = 0;
+        let totalProcessed = 0;
+        let streamTimer = null;
+        
+        // Chart.js setup
+        const agreementCtx = document.getElementById('agreement-chart').getContext('2d');
+        const agreementChart = new Chart(agreementCtx, {
+            type: 'line',
+            data: {
+                labels: [],
+                datasets: [{
+                    label: 'Agreement %',
+                    data: [],
+                    borderColor: '#4caf50',
+                    backgroundColor: 'rgba(76, 175, 80, 0.1)',
+                    tension: 0.4,
+                    fill: true
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        max: 100,
+                        grid: { color: '#1a1a1a' },
+                        ticks: { color: '#666' }
+                    },
+                    x: {
+                        grid: { color: '#1a1a1a' },
+                        ticks: { color: '#666', maxTicksLimit: 10 }
+                    }
+                }
+            }
+        });
+        
+        const distributionCtx = document.getElementById('distribution-chart').getContext('2d');
+        const distributionChart = new Chart(distributionCtx, {
+            type: 'bar',
+            data: {
+                labels: ['Highly Enriched', 'Enriched', 'Neutral', 'Depleted', 'Highly Depleted'],
+                datasets: [{
+                    data: [0, 0, 0, 0, 0],
+                    backgroundColor: [
+                        'rgba(229, 115, 115, 0.6)',
+                        'rgba(255, 183, 77, 0.6)',
+                        'rgba(189, 189, 189, 0.6)',
+                        'rgba(100, 181, 246, 0.6)',
+                        'rgba(63, 81, 181, 0.6)'
+                    ],
+                    borderColor: [
+                        '#e57373',
+                        '#ffb74d',
+                        '#bdbdbd',
+                        '#64b5f6',
+                        '#5c6bc0'
+                    ],
+                    borderWidth: 1
+                }]
+            },
+            options: {
+                responsive: true,
+                maintainAspectRatio: false,
+                plugins: {
+                    legend: { display: false }
+                },
+                scales: {
+                    y: {
+                        beginAtZero: true,
+                        grid: { color: '#1a1a1a' },
+                        ticks: { color: '#666' }
+                    },
+                    x: {
+                        grid: { display: false },
+                        ticks: { 
+                            color: '#666',
+                            font: { size: 9 },
+                            callback: function(value, index) {
+                                const labels = ['H.Enrich', 'Enrich', 'Neutral', 'Deplete', 'H.Deplete'];
+                                return labels[index];
+                            }
+                        }
+                    }
+                }
+            }
+        });
+        
+        // Load sequences
+        async function loadSequences() {
+            try {
+                const response = await fetch(`${API_URL}/api/sequences/top?limit=100`);
+                sequences = await response.json();
+                console.log(`Loaded ${sequences.length} sequences`);
+            } catch (error) {
+                console.error('Error loading sequences:', error);
+            }
+        }
+        
+        // Process next sequence
+        async function processNextSequence() {
+            if (!isStreaming || sequences.length === 0) return;
+            
+            const seq = sequences[currentIndex % sequences.length];
+            currentIndex++;
+            totalProcessed++;
+            
+            // Update counters
+            document.getElementById('total').textContent = totalProcessed;
+            document.getElementById('rate').textContent = (1000 / streamInterval).toFixed(1);
+            
+            // Add to stream
+            addToStream(seq);
+            
+            // Classify with all models
+            try {
+                const response = await fetch(`${API_URL}/api/classify-compare`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        barcode: seq.barcode,
+                        count: seq.count,
+                        z_score: seq.z_score
+                    })
+                });
+                
+                const data = await response.json();
+                updateVisualizations(data);
+                
+            } catch (error) {
+                console.error('Classification error:', error);
+            }
+        }
+        
+        // Add sequence to stream
+        function addToStream(seq) {
+            const stream = document.getElementById('sequence-stream');
+            
+            // Remove old items if too many
+            while (stream.children.length > 10) {
+                stream.removeChild(stream.lastChild);
+            }
+            
+            const item = document.createElement('div');
+            item.className = 'sequence-item processing';
+            
+            const colorized = seq.barcode.split('').map(base => 
+                `<span class="base-${base}">${base}</span>`
+            ).join('');
+            
+            item.innerHTML = `
+                <div class="sequence-text">${colorized}</div>
+                <div class="sequence-meta">
+                    <span>Count: ${seq.count}</span>
+                    <span>Z-score: ${seq.z_score.toFixed(2)}</span>
+                    <span>GC: ${seq.gc_content.toFixed(0)}%</span>
+                </div>
+            `;
+            
+            stream.insertBefore(item, stream.firstChild);
+            
+            // Remove processing class after animation
+            setTimeout(() => {
+                item.classList.remove('processing');
+            }, 500);
+        }
+        
+        // Update visualizations
+        function updateVisualizations(data) {
+            // Update model grid
+            updateModelGrid(data);
+            
+            // Calculate agreement
+            const models = Object.keys(data.individual_results);
+            const consensus = data.consensus;
+            const agreeing = Object.values(data.individual_results)
+                .filter(r => r.classification === consensus).length;
+            
+            const agreementPercent = (agreeing / models.length) * 100;
+            
+            // Update metrics
+            document.getElementById('consensus-score').innerHTML = 
+                `${(data.consensus_confidence * 100).toFixed(0)}<span class="metric-unit">%</span>`;
+            
+            document.getElementById('agreement').innerHTML = 
+                `${agreeing}<span class="metric-unit">/${models.length}</span>`;
+            
+            const agreementBar = document.getElementById('agreement-bar');
+            agreementBar.style.width = `${agreementPercent}%`;
+            agreementBar.className = 'diff-bar ' + 
+                (agreementPercent >= 80 ? 'agreement-high' : 
+                 agreementPercent >= 50 ? 'agreement-medium' : 'agreement-low');
+            
+            // Update agreement chart
+            if (agreementChart.data.labels.length > 20) {
+                agreementChart.data.labels.shift();
+                agreementChart.data.datasets[0].data.shift();
+            }
+            agreementChart.data.labels.push(new Date().toLocaleTimeString());
+            agreementChart.data.datasets[0].data.push(agreementPercent);
+            agreementChart.update('none');
+            
+            // Update distribution chart
+            updateDistributionChart(data);
+            
+            // Update best model
+            const sorted = Object.entries(data.individual_results)
+                .sort((a, b) => (b[1].confidence || 0) - (a[1].confidence || 0));
+            document.getElementById('best-model').textContent = sorted[0][0].toUpperCase();
+            
+            // Update average time
+            const avgTime = Object.values(data.individual_results)
+                .reduce((sum, r) => sum + (r.processing_time || 0), 0) / models.length * 1000;
+            document.getElementById('avg-time').innerHTML = 
+                `${avgTime.toFixed(1)}<span class="metric-unit">ms</span>`;
+        }
+        
+        // Update model grid
+        function updateModelGrid(data) {
+            const grid = document.getElementById('model-grid');
+            grid.innerHTML = '';
+            
+            const models = ['dnabert', 'xgboost', 'random_forest', 'ensemble', 'neural_network',
+                          'svm', 'gradient_boost', 'deepcrispr', 'azimuth', 'crispor'];
+            
+            models.forEach(modelName => {
+                const result = data.individual_results[modelName];
+                if (!result) return;
+                
+                const cell = document.createElement('div');
+                cell.className = 'model-cell';
+                if (result.classification === data.consensus) {
+                    cell.classList.add('active');
+                }
+                
+                const className = result.classification.toLowerCase().replace('_', '-');
+                const confidence = (result.confidence || 0) * 100;
+                
+                cell.innerHTML = `
+                    <div class="model-name">${modelName.substring(0, 8)}</div>
+                    <div class="model-prediction ${className}">
+                        ${result.classification.split('_')[0]}
+                    </div>
+                    <div class="model-confidence">${confidence.toFixed(0)}%</div>
+                `;
+                
+                grid.appendChild(cell);
+            });
+        }
+        
+        // Update distribution chart
+        function updateDistributionChart(data) {
+            const classifications = {
+                'HIGHLY_ENRICHED': 0,
+                'ENRICHED': 1,
+                'NEUTRAL': 2,
+                'DEPLETED': 3,
+                'HIGHLY_DEPLETED': 4
+            };
+            
+            const counts = [0, 0, 0, 0, 0];
+            
+            Object.values(data.individual_results).forEach(result => {
+                const idx = classifications[result.classification];
+                if (idx !== undefined) {
+                    counts[idx]++;
+                }
+            });
+            
+            distributionChart.data.datasets[0].data = counts;
+            distributionChart.update('none');
+        }
+        
+        // Toggle streaming
+        function toggleStream() {
+            isStreaming = !isStreaming;
+            const btn = document.getElementById('pause-btn');
+            btn.textContent = isStreaming ? 'PAUSE' : 'PLAY';
+            btn.classList.toggle('active', isStreaming);
+            
+            document.getElementById('stream-status').textContent = 
+                isStreaming ? 'STREAMING' : 'PAUSED';
+            
+            if (isStreaming) {
+                startStream();
+            } else {
+                stopStream();
+            }
+        }
+        
+        // Change speed
+        function changeSpeed() {
+            const speeds = [500, 1000, 2000, 5000];
+            const labels = ['0.5s', '1s', '2s', '5s'];
+            const currentIdx = speeds.indexOf(streamInterval);
+            const nextIdx = (currentIdx + 1) % speeds.length;
+            
+            streamInterval = speeds[nextIdx];
+            event.target.textContent = `SPEED: ${labels[nextIdx]}`;
+            
+            if (isStreaming) {
+                stopStream();
+                startStream();
+            }
+        }
+        
+        // Start streaming
+        function startStream() {
+            if (streamTimer) clearInterval(streamTimer);
+            streamTimer = setInterval(processNextSequence, streamInterval);
+            processNextSequence(); // Start immediately
+        }
+        
+        // Stop streaming
+        function stopStream() {
+            if (streamTimer) {
+                clearInterval(streamTimer);
+                streamTimer = null;
+            }
+        }
+        
+        // Initialize
+        async function init() {
+            await loadSequences();
+            if (isStreaming) {
+                startStream();
+            }
+        }
+        
+        // Start the application
+        init();
+    </script>
+</body>
+</html>

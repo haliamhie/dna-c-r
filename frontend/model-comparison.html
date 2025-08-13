@@ -1,0 +1,649 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRISPR ML Model Comparison</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #050505;
+            color: #e0e0e0;
+            padding: 20px;
+        }
+        
+        .header {
+            text-align: center;
+            padding: 20px 0 40px;
+            border-bottom: 1px solid #1a1a1a;
+            margin-bottom: 30px;
+        }
+        
+        h1 {
+            font-size: 28px;
+            font-weight: 300;
+            letter-spacing: 2px;
+            margin-bottom: 10px;
+        }
+        
+        .subtitle {
+            color: #666;
+            font-size: 14px;
+        }
+        
+        .main-grid {
+            display: grid;
+            grid-template-columns: 400px 1fr;
+            gap: 30px;
+            max-width: 1400px;
+            margin: 0 auto;
+        }
+        
+        .panel {
+            background: #0a0a0a;
+            border: 1px solid #1a1a1a;
+            border-radius: 8px;
+            padding: 20px;
+        }
+        
+        h2 {
+            font-size: 14px;
+            font-weight: 500;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            margin-bottom: 20px;
+        }
+        
+        /* Input Section */
+        .input-group {
+            margin-bottom: 20px;
+        }
+        
+        label {
+            display: block;
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        
+        input, select {
+            width: 100%;
+            padding: 10px;
+            background: #0f0f0f;
+            border: 1px solid #2a2a2a;
+            border-radius: 4px;
+            color: #fff;
+            font-size: 13px;
+            font-family: 'SF Mono', Monaco, monospace;
+        }
+        
+        input:focus, select:focus {
+            outline: none;
+            border-color: #4caf50;
+            background: #141414;
+        }
+        
+        button {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(135deg, #4caf50, #45a049);
+            border: none;
+            border-radius: 4px;
+            color: white;
+            font-size: 13px;
+            font-weight: 500;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        button:hover {
+            transform: translateY(-1px);
+            box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+        }
+        
+        button:disabled {
+            background: #333;
+            cursor: not-allowed;
+            transform: none;
+        }
+        
+        /* Results Grid */
+        .models-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+        }
+        
+        .model-card {
+            background: #0f0f0f;
+            border: 1px solid #1a1a1a;
+            border-radius: 6px;
+            padding: 15px;
+            transition: all 0.3s ease;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .model-card:hover {
+            border-color: #333;
+            transform: translateY(-2px);
+        }
+        
+        .model-card.winner {
+            border-color: #4caf50;
+            background: linear-gradient(135deg, rgba(76, 175, 80, 0.05), transparent);
+        }
+        
+        .model-card.winner::before {
+            content: '✓ CONSENSUS';
+            position: absolute;
+            top: 5px;
+            right: 5px;
+            font-size: 9px;
+            color: #4caf50;
+            background: rgba(76, 175, 80, 0.1);
+            padding: 2px 6px;
+            border-radius: 3px;
+        }
+        
+        .model-name {
+            font-size: 12px;
+            color: #888;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+        }
+        
+        .classification-badge {
+            display: inline-block;
+            padding: 6px 12px;
+            border-radius: 4px;
+            font-size: 11px;
+            font-weight: 500;
+            margin-bottom: 10px;
+            width: 100%;
+            text-align: center;
+        }
+        
+        .highly-enriched { background: rgba(229, 115, 115, 0.2); color: #e57373; }
+        .enriched { background: rgba(255, 183, 77, 0.2); color: #ffb74d; }
+        .neutral { background: rgba(189, 189, 189, 0.2); color: #bdbdbd; }
+        .depleted { background: rgba(100, 181, 246, 0.2); color: #64b5f6; }
+        .highly-depleted { background: rgba(63, 81, 181, 0.2); color: #5c6bc0; }
+        
+        .confidence-bar {
+            height: 4px;
+            background: #1a1a1a;
+            border-radius: 2px;
+            overflow: hidden;
+            margin: 8px 0;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #4caf50, #8bc34a);
+            transition: width 0.5s ease;
+        }
+        
+        .metric {
+            display: flex;
+            justify-content: space-between;
+            font-size: 10px;
+            color: #666;
+            margin-top: 5px;
+        }
+        
+        .metric-value {
+            color: #999;
+        }
+        
+        /* Performance Dashboard */
+        .performance-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 15px;
+            margin-top: 20px;
+        }
+        
+        .perf-card {
+            background: #0f0f0f;
+            border: 1px solid #1a1a1a;
+            border-radius: 4px;
+            padding: 15px;
+            text-align: center;
+        }
+        
+        .perf-label {
+            font-size: 10px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 8px;
+        }
+        
+        .perf-value {
+            font-size: 24px;
+            font-weight: 300;
+            color: #fff;
+        }
+        
+        .perf-unit {
+            font-size: 11px;
+            color: #666;
+            margin-left: 4px;
+        }
+        
+        /* Loading Animation */
+        .loading {
+            display: none;
+            text-align: center;
+            padding: 40px;
+        }
+        
+        .loading.active {
+            display: block;
+        }
+        
+        .spinner {
+            width: 40px;
+            height: 40px;
+            border: 3px solid #1a1a1a;
+            border-top: 3px solid #4caf50;
+            border-radius: 50%;
+            animation: spin 1s linear infinite;
+            margin: 0 auto 20px;
+        }
+        
+        @keyframes spin {
+            0% { transform: rotate(0deg); }
+            100% { transform: rotate(360deg); }
+        }
+        
+        /* Consensus Section */
+        .consensus-panel {
+            background: linear-gradient(135deg, rgba(76, 175, 80, 0.05), transparent);
+            border: 1px solid #2a2a2a;
+            border-radius: 8px;
+            padding: 20px;
+            margin-top: 20px;
+        }
+        
+        .consensus-header {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            margin-bottom: 15px;
+        }
+        
+        .consensus-title {
+            font-size: 14px;
+            color: #4caf50;
+            text-transform: uppercase;
+        }
+        
+        .agreement-indicator {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .agreement-dot {
+            width: 8px;
+            height: 8px;
+            border-radius: 50%;
+            background: #666;
+        }
+        
+        .agreement-dot.agree {
+            background: #4caf50;
+            animation: pulse 2s ease infinite;
+        }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.6; }
+        }
+        
+        /* Recommendations */
+        .recommendations {
+            background: #0f0f0f;
+            border: 1px solid #1a1a1a;
+            border-radius: 6px;
+            padding: 15px;
+            margin-top: 20px;
+        }
+        
+        .rec-item {
+            padding: 10px;
+            margin-bottom: 10px;
+            background: #141414;
+            border-radius: 4px;
+            font-size: 12px;
+            display: flex;
+            align-items: center;
+            gap: 10px;
+        }
+        
+        .rec-icon {
+            width: 24px;
+            height: 24px;
+            background: rgba(76, 175, 80, 0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #4caf50;
+            font-size: 14px;
+        }
+    </style>
+</head>
+<body>
+    <div class="header">
+        <h1>CRISPR ML Model Comparison</h1>
+        <div class="subtitle">Compare multiple machine learning models for sequence classification</div>
+    </div>
+    
+    <div class="main-grid">
+        <!-- Input Panel -->
+        <div class="panel">
+            <h2>Sequence Input</h2>
+            
+            <div class="input-group">
+                <label>DNA Sequence (14bp)</label>
+                <input type="text" id="sequence-input" 
+                       placeholder="e.g., GTCTTTCTGCTCGT" 
+                       maxlength="14" 
+                       value="GTCTTTCTGCTCGT">
+            </div>
+            
+            <div class="input-group">
+                <label>Count</label>
+                <input type="number" id="count-input" 
+                       placeholder="e.g., 800" 
+                       value="800">
+            </div>
+            
+            <div class="input-group">
+                <label>Z-Score</label>
+                <input type="number" id="zscore-input" 
+                       placeholder="e.g., 2.5" 
+                       step="0.1" 
+                       value="2.5">
+            </div>
+            
+            <div class="input-group">
+                <label>Primary Model</label>
+                <select id="model-select">
+                    <option value="ensemble">Ensemble (Recommended)</option>
+                    <option value="xgboost">XGBoost</option>
+                    <option value="random_forest">Random Forest</option>
+                    <option value="neural_network">Neural Network</option>
+                    <option value="dnabert">DNABERT</option>
+                    <option value="svm">Support Vector Machine</option>
+                    <option value="gradient_boost">Gradient Boosting</option>
+                    <option value="deepcrispr">DeepCRISPR</option>
+                    <option value="azimuth">Azimuth</option>
+                    <option value="crispor">CRISPOR</option>
+                </select>
+            </div>
+            
+            <button onclick="classifySequence()">Classify with All Models</button>
+            
+            <div class="performance-grid">
+                <div class="perf-card">
+                    <div class="perf-label">Total Models</div>
+                    <div class="perf-value" id="total-models">0</div>
+                </div>
+                <div class="perf-card">
+                    <div class="perf-label">Avg Speed</div>
+                    <div class="perf-value" id="avg-speed">-<span class="perf-unit">ms</span></div>
+                </div>
+                <div class="perf-card">
+                    <div class="perf-label">Consensus</div>
+                    <div class="perf-value" id="consensus-conf">-<span class="perf-unit">%</span></div>
+                </div>
+            </div>
+            
+            <div class="recommendations" id="recommendations" style="display: none;">
+                <h2>Recommendations</h2>
+                <div id="rec-content"></div>
+            </div>
+        </div>
+        
+        <!-- Results Panel -->
+        <div class="panel">
+            <h2>Model Comparison Results</h2>
+            
+            <div class="loading" id="loading">
+                <div class="spinner"></div>
+                <div>Running classification on all models...</div>
+            </div>
+            
+            <div class="models-grid" id="models-grid"></div>
+            
+            <div class="consensus-panel" id="consensus-panel" style="display: none;">
+                <div class="consensus-header">
+                    <div class="consensus-title">Consensus Classification</div>
+                    <div class="agreement-indicator">
+                        <span id="agreement-text">-</span>
+                        <div class="agreement-dot" id="agreement-dot"></div>
+                    </div>
+                </div>
+                <div id="consensus-details"></div>
+            </div>
+        </div>
+    </div>
+    
+    <script>
+        const API_URL = 'http://localhost:8000';
+        
+        async function classifySequence() {
+            const sequence = document.getElementById('sequence-input').value.toUpperCase();
+            const count = parseInt(document.getElementById('count-input').value) || 100;
+            const zScore = parseFloat(document.getElementById('zscore-input').value) || 0;
+            
+            if (!sequence || sequence.length !== 14) {
+                alert('Please enter a valid 14bp DNA sequence');
+                return;
+            }
+            
+            // Show loading
+            document.getElementById('loading').classList.add('active');
+            document.getElementById('models-grid').innerHTML = '';
+            document.getElementById('consensus-panel').style.display = 'none';
+            
+            try {
+                // Call comparison API
+                const response = await fetch(`${API_URL}/api/classify-compare`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        barcode: sequence,
+                        count: count,
+                        z_score: zScore
+                    })
+                });
+                
+                const data = await response.json();
+                displayResults(data);
+                
+            } catch (error) {
+                console.error('Classification error:', error);
+                alert('Error during classification');
+            } finally {
+                document.getElementById('loading').classList.remove('active');
+            }
+        }
+        
+        function displayResults(data) {
+            const grid = document.getElementById('models-grid');
+            const consensus = data.consensus;
+            
+            // Sort models by confidence
+            const sortedModels = Object.entries(data.individual_results)
+                .sort((a, b) => (b[1].confidence || 0) - (a[1].confidence || 0));
+            
+            // Display each model result
+            sortedModels.forEach(([modelName, result]) => {
+                const isConsensus = result.classification === consensus;
+                
+                const card = document.createElement('div');
+                card.className = `model-card ${isConsensus ? 'winner' : ''}`;
+                
+                const className = result.classification.toLowerCase().replace('_', '-');
+                const confidence = (result.confidence || 0) * 100;
+                const processingTime = (result.processing_time || 0) * 1000;
+                
+                card.innerHTML = `
+                    <div class="model-name">${modelName}</div>
+                    <div class="classification-badge ${className}">
+                        ${result.classification.replace('_', ' ')}
+                    </div>
+                    <div class="confidence-bar">
+                        <div class="confidence-fill" style="width: ${confidence}%"></div>
+                    </div>
+                    <div class="metric">
+                        <span>Confidence:</span>
+                        <span class="metric-value">${confidence.toFixed(1)}%</span>
+                    </div>
+                    <div class="metric">
+                        <span>Speed:</span>
+                        <span class="metric-value">${processingTime.toFixed(2)}ms</span>
+                    </div>
+                    ${result.gc_content ? `
+                    <div class="metric">
+                        <span>GC Content:</span>
+                        <span class="metric-value">${result.gc_content.toFixed(1)}%</span>
+                    </div>` : ''}
+                `;
+                
+                grid.appendChild(card);
+            });
+            
+            // Display consensus
+            const consensusPanel = document.getElementById('consensus-panel');
+            consensusPanel.style.display = 'block';
+            
+            const consensusConf = data.consensus_confidence * 100;
+            document.getElementById('consensus-conf').innerHTML = 
+                `${consensusConf.toFixed(0)}<span class="perf-unit">%</span>`;
+            
+            const agreementDot = document.getElementById('agreement-dot');
+            const agreementText = document.getElementById('agreement-text');
+            
+            if (data.models_agree) {
+                agreementDot.classList.add('agree');
+                agreementText.textContent = 'All models agree';
+            } else {
+                agreementDot.classList.remove('agree');
+                agreementText.textContent = 'Models disagree';
+            }
+            
+            // Consensus details
+            const className = consensus.toLowerCase().replace('_', '-');
+            document.getElementById('consensus-details').innerHTML = `
+                <div class="classification-badge ${className}" style="font-size: 14px; padding: 10px;">
+                    ${consensus.replace('_', ' ')}
+                </div>
+                <div class="metric" style="margin-top: 10px;">
+                    <span>Confidence:</span>
+                    <span class="metric-value">${consensusConf.toFixed(1)}%</span>
+                </div>
+                <div class="metric">
+                    <span>Models in agreement:</span>
+                    <span class="metric-value">${
+                        Object.values(data.individual_results)
+                            .filter(r => r.classification === consensus).length
+                    }/${Object.keys(data.individual_results).length}</span>
+                </div>
+            `;
+            
+            // Update stats
+            document.getElementById('total-models').textContent = 
+                Object.keys(data.individual_results).length;
+            
+            const avgSpeed = Object.values(data.individual_results)
+                .reduce((sum, r) => sum + (r.processing_time || 0), 0) / 
+                Object.keys(data.individual_results).length * 1000;
+            
+            document.getElementById('avg-speed').innerHTML = 
+                `${avgSpeed.toFixed(1)}<span class="perf-unit">ms</span>`;
+            
+            // Show recommendations
+            showRecommendations(data);
+        }
+        
+        function showRecommendations(data) {
+            const recPanel = document.getElementById('recommendations');
+            const recContent = document.getElementById('rec-content');
+            
+            recPanel.style.display = 'block';
+            
+            // Find best performing models
+            const sortedByConfidence = Object.entries(data.individual_results)
+                .sort((a, b) => (b[1].confidence || 0) - (a[1].confidence || 0))
+                .slice(0, 3);
+            
+            const sortedBySpeed = Object.entries(data.individual_results)
+                .sort((a, b) => (a[1].processing_time || 0) - (b[1].processing_time || 0))
+                .slice(0, 3);
+            
+            recContent.innerHTML = `
+                <div class="rec-item">
+                    <div class="rec-icon">🎯</div>
+                    <div>
+                        <strong>Most Confident:</strong> ${sortedByConfidence[0][0]} 
+                        (${((sortedByConfidence[0][1].confidence || 0) * 100).toFixed(1)}%)
+                    </div>
+                </div>
+                <div class="rec-item">
+                    <div class="rec-icon">⚡</div>
+                    <div>
+                        <strong>Fastest:</strong> ${sortedBySpeed[0][0]} 
+                        (${((sortedBySpeed[0][1].processing_time || 0) * 1000).toFixed(2)}ms)
+                    </div>
+                </div>
+                <div class="rec-item">
+                    <div class="rec-icon">✓</div>
+                    <div>
+                        <strong>Consensus:</strong> ${data.consensus} 
+                        (${(data.consensus_confidence * 100).toFixed(1)}% agreement)
+                    </div>
+                </div>
+            `;
+        }
+        
+        // Load available models on page load
+        async function loadModels() {
+            try {
+                const response = await fetch(`${API_URL}/api/models`);
+                const data = await response.json();
+                
+                const select = document.getElementById('model-select');
+                select.innerHTML = '';
+                
+                data.models.forEach(model => {
+                    const option = document.createElement('option');
+                    option.value = model;
+                    option.textContent = model.charAt(0).toUpperCase() + model.slice(1).replace('_', ' ');
+                    if (model === data.default) {
+                        option.selected = true;
+                        option.textContent += ' (Recommended)';
+                    }
+                    select.appendChild(option);
+                });
+                
+            } catch (error) {
+                console.error('Error loading models:', error);
+            }
+        }
+        
+        // Initialize
+        loadModels();
+    </script>
+</body>
+</html>

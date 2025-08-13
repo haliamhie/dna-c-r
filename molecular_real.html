@@ -1,0 +1,568 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Molecular DNA Visualization - Real CRISPR Data</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: linear-gradient(135deg, #000011, #000033);
+  font-family: 'Courier New', monospace;
+  color: #fff;
+  overflow: hidden;
+}
+
+#ngl-viewport {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+#dna-3dmol {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  width: 50%;
+  height: 50%;
+  z-index: 2;
+  border: 1px solid #00ffff;
+}
+
+#controls {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  background: rgba(0,0,0,0.9);
+  padding: 20px;
+  border: 2px solid #00ffff;
+  border-radius: 10px;
+  z-index: 1000;
+  max-width: 400px;
+}
+
+.control-row {
+  margin: 10px 0;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.control-label {
+  color: #00ffff;
+  font-size: 12px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.control-value {
+  color: #00ff00;
+  font-weight: bold;
+  font-size: 14px;
+}
+
+#sequence-display {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 400px;
+  background: rgba(0,0,0,0.9);
+  border: 2px solid #ff00ff;
+  border-radius: 10px;
+  padding: 15px;
+  z-index: 1000;
+}
+
+.sequence-3d {
+  font-family: monospace;
+  font-size: 14px;
+  line-height: 1.5;
+  max-height: 200px;
+  overflow-y: auto;
+}
+
+.base-A { color: #ff0000; font-weight: bold; }
+.base-T { color: #0000ff; font-weight: bold; }
+.base-G { color: #ffff00; font-weight: bold; }
+.base-C { color: #00ff00; font-weight: bold; }
+
+#helix-canvas {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 300px;
+  z-index: 10;
+}
+
+.helix-controls {
+  position: absolute;
+  bottom: 310px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.9);
+  padding: 15px;
+  border: 1px solid #00ffff;
+  border-radius: 10px;
+  z-index: 1000;
+  display: flex;
+  gap: 20px;
+}
+
+button {
+  background: linear-gradient(135deg, #00ffff, #ff00ff);
+  border: none;
+  color: #000;
+  padding: 10px 20px;
+  border-radius: 5px;
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+
+button:hover {
+  transform: scale(1.1);
+  box-shadow: 0 0 20px #00ffff;
+}
+
+#metrics {
+  position: absolute;
+  top: 50%;
+  right: 20px;
+  transform: translateY(-50%);
+  background: rgba(0,0,0,0.9);
+  border: 2px solid #ffff00;
+  border-radius: 10px;
+  padding: 20px;
+  z-index: 1000;
+}
+
+.metric {
+  margin: 15px 0;
+}
+
+.metric-bar {
+  width: 200px;
+  height: 10px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 5px;
+  overflow: hidden;
+  margin-top: 5px;
+}
+
+.metric-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00ff00, #00ffff, #ff00ff);
+  transition: width 0.5s;
+}
+</style>
+</head>
+<body>
+
+<div id="ngl-viewport"></div>
+<div id="dna-3dmol"></div>
+<canvas id="helix-canvas"></canvas>
+
+<div id="controls">
+  <h3 style="color: #00ffff; margin-bottom: 15px;">MOLECULAR DNA VIEWER</h3>
+  <div class="control-row">
+    <span class="control-label">Current Barcode:</span>
+    <span class="control-value" id="current-barcode">-</span>
+  </div>
+  <div class="control-row">
+    <span class="control-label">Structure Type:</span>
+    <span class="control-value" id="structure-type">B-DNA</span>
+  </div>
+  <div class="control-row">
+    <span class="control-label">Base Pairs:</span>
+    <span class="control-value" id="base-pairs">14</span>
+  </div>
+  <div class="control-row">
+    <span class="control-label">Helix Turns:</span>
+    <span class="control-value" id="helix-turns">1.3</span>
+  </div>
+  <div class="control-row">
+    <span class="control-label">GC Content:</span>
+    <span class="control-value" id="gc-content">0%</span>
+  </div>
+</div>
+
+<div id="sequence-display">
+  <h3 style="color: #ff00ff; margin-bottom: 10px;">REAL SEQUENCES</h3>
+  <div class="sequence-3d" id="seq-list"></div>
+</div>
+
+<div id="metrics">
+  <h3 style="color: #ffff00; margin-bottom: 15px;">LIVE METRICS</h3>
+  <div class="metric">
+    <div class="control-label">Processed</div>
+    <div class="control-value" id="processed">0</div>
+    <div class="metric-bar">
+      <div class="metric-fill" id="processed-bar" style="width: 0%;"></div>
+    </div>
+  </div>
+  <div class="metric">
+    <div class="control-label">Enriched</div>
+    <div class="control-value" id="enriched">0</div>
+    <div class="metric-bar">
+      <div class="metric-fill" id="enriched-bar" style="width: 0%;"></div>
+    </div>
+  </div>
+</div>
+
+<div class="helix-controls">
+  <button onclick="viewMode('cartoon')">Cartoon</button>
+  <button onclick="viewMode('surface')">Surface</button>
+  <button onclick="viewMode('ball+stick')">Ball & Stick</button>
+  <button onclick="viewMode('backbone')">Backbone</button>
+  <button onclick="toggleRotation()">Toggle Rotation</button>
+</div>
+
+<!-- NGL Viewer -->
+<script src="https://cdn.jsdelivr.net/npm/ngl@2.0.0-dev.37/dist/ngl.js"></script>
+
+<!-- 3Dmol.js -->
+<script src="https://3Dmol.org/build/3Dmol-min.js"></script>
+
+<!-- Custom DNA.js implementation -->
+<script>
+// DNA structural parameters
+const DNA_PARAMS = {
+  RISE: 3.4,  // Angstroms per base pair
+  TWIST: 36,  // Degrees per base pair
+  RADIUS: 10, // Angstroms
+  BASES: {
+    'A': { color: 0xFF0000, complement: 'T', size: 1.2 },
+    'T': { color: 0x0000FF, complement: 'A', size: 1.0 },
+    'G': { color: 0xFFFF00, complement: 'C', size: 1.3 },
+    'C': { color: 0x00FF00, complement: 'G', size: 1.1 }
+  }
+};
+
+// Initialize NGL Stage
+let stage = null;
+let currentStructure = null;
+let isRotating = true;
+
+function initNGL() {
+  stage = new NGL.Stage("ngl-viewport", {
+    backgroundColor: "black",
+    fogNear: 50,
+    fogFar: 100
+  });
+  
+  // Handle window resize
+  window.addEventListener("resize", () => {
+    stage.handleResize();
+  }, false);
+}
+
+// Generate PDB format from barcode sequence
+function generatePDBFromBarcode(barcode) {
+  let pdb = "HEADER    DNA CRISPR BARCODE\n";
+  pdb += "TITLE     REAL SEQUENCE FROM CRISPR SCREENING\n";
+  
+  let atomNum = 1;
+  const complementary = barcode.split('').map(b => DNA_PARAMS.BASES[b].complement).join('');
+  
+  // Generate atoms for each base pair
+  for (let i = 0; i < barcode.length; i++) {
+    const base1 = barcode[i];
+    const base2 = complementary[i];
+    const z = i * DNA_PARAMS.RISE;
+    const angle = (i * DNA_PARAMS.TWIST) * Math.PI / 180;
+    
+    // Strand 1
+    const x1 = Math.cos(angle) * DNA_PARAMS.RADIUS;
+    const y1 = Math.sin(angle) * DNA_PARAMS.RADIUS;
+    
+    // Phosphate backbone
+    pdb += `ATOM  ${String(atomNum).padStart(5)} P    D${base1} A${String(i+1).padStart(4)}    `;
+    pdb += `${String(x1.toFixed(3)).padStart(8)}${String(y1.toFixed(3)).padStart(8)}`;
+    pdb += `${String(z.toFixed(3)).padStart(8)}  1.00  0.00           P\n`;
+    atomNum++;
+    
+    // Base
+    pdb += `ATOM  ${String(atomNum).padStart(5)} N1   D${base1} A${String(i+1).padStart(4)}    `;
+    pdb += `${String((x1*0.5).toFixed(3)).padStart(8)}${String((y1*0.5).toFixed(3)).padStart(8)}`;
+    pdb += `${String(z.toFixed(3)).padStart(8)}  1.00  0.00           N\n`;
+    atomNum++;
+    
+    // Strand 2
+    const x2 = Math.cos(angle + Math.PI) * DNA_PARAMS.RADIUS;
+    const y2 = Math.sin(angle + Math.PI) * DNA_PARAMS.RADIUS;
+    
+    pdb += `ATOM  ${String(atomNum).padStart(5)} P    D${base2} B${String(i+1).padStart(4)}    `;
+    pdb += `${String(x2.toFixed(3)).padStart(8)}${String(y2.toFixed(3)).padStart(8)}`;
+    pdb += `${String(z.toFixed(3)).padStart(8)}  1.00  0.00           P\n`;
+    atomNum++;
+    
+    pdb += `ATOM  ${String(atomNum).padStart(5)} N1   D${base2} B${String(i+1).padStart(4)}    `;
+    pdb += `${String((x2*0.5).toFixed(3)).padStart(8)}${String((y2*0.5).toFixed(3)).padStart(8)}`;
+    pdb += `${String(z.toFixed(3)).padStart(8)}  1.00  0.00           N\n`;
+    atomNum++;
+  }
+  
+  pdb += "END\n";
+  return pdb;
+}
+
+// Load DNA structure into NGL
+function loadDNAStructure(barcode) {
+  if (!stage) return;
+  
+  // Clear previous structure
+  if (currentStructure) {
+    stage.removeComponent(currentStructure);
+  }
+  
+  const pdbData = generatePDBFromBarcode(barcode);
+  const blob = new Blob([pdbData], { type: 'text/plain' });
+  
+  stage.loadFile(blob, { ext: "pdb" }).then(component => {
+    currentStructure = component;
+    
+    // Add representations
+    component.addRepresentation("cartoon", {
+      color: "chainindex",
+      opacity: 0.7
+    });
+    
+    component.addRepresentation("ball+stick", {
+      colorScheme: "element",
+      radiusScale: 0.5
+    });
+    
+    component.addRepresentation("surface", {
+      opacity: 0.3,
+      color: "hydrophobicity"
+    });
+    
+    // Center and auto-view
+    component.autoView();
+    
+    // Start rotation
+    if (isRotating) {
+      stage.setParameters({ cameraType: "perspective" });
+      stage.setSpin([0, 1, 0], 0.01);
+    }
+  });
+  
+  // Update info
+  document.getElementById('current-barcode').textContent = barcode;
+  const gc = ((barcode.match(/[GC]/g) || []).length / barcode.length * 100).toFixed(1);
+  document.getElementById('gc-content').textContent = gc + '%';
+}
+
+// Initialize 3Dmol viewer
+let viewer3Dmol = null;
+
+function init3Dmol() {
+  const element = document.getElementById('dna-3dmol');
+  viewer3Dmol = $3Dmol.createViewer(element, {
+    backgroundColor: 'black'
+  });
+  
+  // Add axes
+  viewer3Dmol.addBox({
+    center: {x: 0, y: 0, z: 0},
+    dimensions: {w: 0.1, h: 50, d: 0.1},
+    color: 'cyan',
+    opacity: 0.5
+  });
+}
+
+// Generate 3D model from barcode
+function generate3DModel(barcode) {
+  if (!viewer3Dmol) return;
+  
+  viewer3Dmol.removeAllModels();
+  viewer3Dmol.removeAllSurfaces();
+  
+  // Create double helix
+  for (let i = 0; i < barcode.length; i++) {
+    const base = barcode[i];
+    const angle = (i * 36) * Math.PI / 180;
+    const height = i * 3.4;
+    
+    // Strand 1
+    const x1 = Math.cos(angle) * 10;
+    const y1 = Math.sin(angle) * 10;
+    
+    viewer3Dmol.addSphere({
+      center: {x: x1, y: height, z: y1},
+      radius: 2,
+      color: DNA_PARAMS.BASES[base].color
+    });
+    
+    // Strand 2 (complementary)
+    const x2 = Math.cos(angle + Math.PI) * 10;
+    const y2 = Math.sin(angle + Math.PI) * 10;
+    const comp = DNA_PARAMS.BASES[base].complement;
+    
+    viewer3Dmol.addSphere({
+      center: {x: x2, y: height, z: y2},
+      radius: 2,
+      color: DNA_PARAMS.BASES[comp].color
+    });
+    
+    // Base pair connection
+    viewer3Dmol.addCylinder({
+      start: {x: x1, y: height, z: y1},
+      end: {x: x2, y: height, z: y2},
+      radius: 0.5,
+      color: 'gray'
+    });
+  }
+  
+  viewer3Dmol.zoomTo();
+  viewer3Dmol.render();
+  viewer3Dmol.spin(true);
+}
+
+// Canvas-based helix visualization
+function drawHelixCanvas() {
+  const canvas = document.getElementById('helix-canvas');
+  const ctx = canvas.getContext('2d');
+  canvas.width = window.innerWidth;
+  canvas.height = 300;
+  
+  let offset = 0;
+  
+  function animate() {
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw DNA strands
+    for (let x = 0; x < canvas.width; x += 5) {
+      const y1 = 150 + Math.sin((x + offset) * 0.02) * 50;
+      const y2 = 150 + Math.sin((x + offset) * 0.02 + Math.PI) * 50;
+      
+      // Strand 1
+      ctx.fillStyle = '#00ffff';
+      ctx.fillRect(x, y1, 3, 3);
+      
+      // Strand 2
+      ctx.fillStyle = '#ff00ff';
+      ctx.fillRect(x, y2, 3, 3);
+      
+      // Base pairs
+      if (x % 20 === 0) {
+        ctx.strokeStyle = 'rgba(255, 255, 255, 0.3)';
+        ctx.beginPath();
+        ctx.moveTo(x, y1);
+        ctx.lineTo(x, y2);
+        ctx.stroke();
+      }
+    }
+    
+    offset += 2;
+    requestAnimationFrame(animate);
+  }
+  
+  animate();
+}
+
+// View mode controls
+function viewMode(mode) {
+  if (currentStructure) {
+    currentStructure.removeAllRepresentations();
+    currentStructure.addRepresentation(mode, {
+      color: mode === 'cartoon' ? 'chainindex' : 'element'
+    });
+  }
+}
+
+function toggleRotation() {
+  isRotating = !isRotating;
+  if (stage) {
+    stage.setSpin(isRotating ? [0, 1, 0] : [0, 0, 0], 0.01);
+  }
+  if (viewer3Dmol) {
+    viewer3Dmol.spin(isRotating);
+  }
+}
+
+// WebSocket for real data
+let ws = null;
+let processedCount = 0;
+let enrichedCount = 0;
+
+function connectToRealData() {
+  ws = new WebSocket('ws://localhost:8766');
+  
+  ws.onopen = () => {
+    console.log('Connected to REAL sequence data!');
+  };
+  
+  ws.onmessage = (event) => {
+    const message = JSON.parse(event.data);
+    
+    if (message.type === 'sequence' && message.data.barcode) {
+      processedCount++;
+      
+      // Update display
+      const barcode = message.data.barcode;
+      addSequenceToDisplay(barcode, message.data);
+      
+      // Update 3D structures periodically
+      if (processedCount % 100 === 0) {
+        loadDNAStructure(barcode);
+        generate3DModel(barcode);
+      }
+      
+      // Update metrics
+      document.getElementById('processed').textContent = processedCount.toLocaleString();
+      document.getElementById('processed-bar').style.width = 
+        Math.min(processedCount / 70000 * 100, 100) + '%';
+      
+      if (message.data.enriched) {
+        enrichedCount++;
+        document.getElementById('enriched').textContent = enrichedCount;
+        document.getElementById('enriched-bar').style.width = 
+          Math.min(enrichedCount / 50 * 100, 100) + '%';
+      }
+    }
+  };
+  
+  ws.onclose = () => {
+    setTimeout(connectToRealData, 2000);
+  };
+}
+
+function addSequenceToDisplay(barcode, data) {
+  const list = document.getElementById('seq-list');
+  const div = document.createElement('div');
+  
+  const colored = barcode.split('').map(b => 
+    `<span class="base-${b}">${b}</span>`
+  ).join('');
+  
+  div.innerHTML = colored;
+  if (data.enriched) {
+    div.style.background = 'rgba(255, 0, 255, 0.2)';
+    div.innerHTML += ` <span style="color: #ff00ff;">★ Z=${data.z_score.toFixed(2)}</span>`;
+  }
+  
+  list.insertBefore(div, list.firstChild);
+  while (list.children.length > 10) {
+    list.removeChild(list.lastChild);
+  }
+}
+
+// Initialize everything
+window.onload = () => {
+  initNGL();
+  init3Dmol();
+  drawHelixCanvas();
+  connectToRealData();
+  
+  // Load initial test structure
+  loadDNAStructure('GTCTTTCTGCTCGT');
+  generate3DModel('GTCTTTCTGCTCGT');
+};
+</script>
+</body>
+</html>

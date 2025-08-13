@@ -1,0 +1,971 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRISPR AI Analysis - Unified Visualization</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: #050505;
+            color: #e0e0e0;
+            overflow: hidden;
+        }
+        
+        .main-container {
+            display: grid;
+            grid-template-columns: 350px 1fr 300px;
+            height: 100vh;
+            gap: 1px;
+            background: #0a0a0a;
+        }
+        
+        .panel {
+            background: #0a0a0a;
+            padding: 20px;
+            overflow-y: auto;
+            position: relative;
+        }
+        
+        .panel::-webkit-scrollbar {
+            width: 4px;
+        }
+        
+        .panel::-webkit-scrollbar-track {
+            background: #111;
+        }
+        
+        .panel::-webkit-scrollbar-thumb {
+            background: #333;
+            border-radius: 2px;
+        }
+        
+        h2 {
+            font-size: 13px;
+            font-weight: 500;
+            color: #888;
+            text-transform: uppercase;
+            letter-spacing: 1.5px;
+            margin-bottom: 20px;
+            padding-bottom: 10px;
+            border-bottom: 1px solid #1a1a1a;
+        }
+        
+        /* Left Panel: Sequence Stream */
+        .sequence-card {
+            background: #0f0f0f;
+            border: 1px solid #1a1a1a;
+            border-radius: 4px;
+            padding: 12px;
+            margin-bottom: 10px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            position: relative;
+        }
+        
+        .sequence-card:hover {
+            background: #141414;
+            border-color: #333;
+            transform: translateX(2px);
+        }
+        
+        .sequence-card.processing {
+            background: #141414;
+            border-color: #444;
+            border-left: 3px solid #4caf50;
+        }
+        
+        .sequence-card.processed {
+            opacity: 0.6;
+        }
+        
+        .barcode-display {
+            font-family: 'SF Mono', Monaco, monospace;
+            font-size: 11px;
+            letter-spacing: 0.5px;
+            margin-bottom: 8px;
+            word-break: break-all;
+        }
+        
+        .base-A { color: #e57373; }
+        .base-T { color: #64b5f6; }
+        .base-G { color: #fff59d; }
+        .base-C { color: #81c784; }
+        
+        .sequence-meta {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 8px;
+            font-size: 10px;
+            color: #666;
+            margin-top: 8px;
+        }
+        
+        .meta-item {
+            display: flex;
+            justify-content: space-between;
+        }
+        
+        .meta-value {
+            color: #999;
+            font-weight: 500;
+        }
+        
+        /* Center: 3D Visualization */
+        #viz-container {
+            background: #000;
+            position: relative;
+        }
+        
+        #dna-canvas {
+            width: 100%;
+            height: 100%;
+        }
+        
+        .reconstruction-overlay {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            background: rgba(10, 10, 10, 0.9);
+            border: 1px solid #222;
+            border-radius: 4px;
+            padding: 15px;
+            max-width: 300px;
+            backdrop-filter: blur(10px);
+        }
+        
+        .reconstruction-title {
+            font-size: 11px;
+            color: #888;
+            margin-bottom: 10px;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .reconstruction-progress {
+            display: flex;
+            gap: 2px;
+            margin-bottom: 10px;
+        }
+        
+        .base-block {
+            flex: 1;
+            height: 20px;
+            background: #1a1a1a;
+            border-radius: 2px;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 10px;
+            font-weight: 600;
+            transition: all 0.3s ease;
+        }
+        
+        .base-block.reconstructed {
+            animation: reconstruct 0.5s ease;
+        }
+        
+        @keyframes reconstruct {
+            0% { transform: scale(0); opacity: 0; }
+            50% { transform: scale(1.1); }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        
+        .ai-thinking {
+            font-size: 10px;
+            color: #666;
+            margin-top: 10px;
+            display: flex;
+            align-items: center;
+            gap: 5px;
+        }
+        
+        .thinking-dot {
+            width: 4px;
+            height: 4px;
+            background: #4caf50;
+            border-radius: 50%;
+            animation: pulse 1.5s ease infinite;
+        }
+        
+        .thinking-dot:nth-child(2) { animation-delay: 0.3s; }
+        .thinking-dot:nth-child(3) { animation-delay: 0.6s; }
+        
+        @keyframes pulse {
+            0%, 100% { opacity: 0.3; }
+            50% { opacity: 1; }
+        }
+        
+        /* Right Panel: Analysis Results */
+        .classification-result {
+            background: #0f0f0f;
+            border: 1px solid #1a1a1a;
+            border-radius: 4px;
+            padding: 15px;
+            margin-bottom: 15px;
+        }
+        
+        .classification-label {
+            font-size: 11px;
+            color: #666;
+            margin-bottom: 8px;
+            text-transform: uppercase;
+        }
+        
+        .classification-value {
+            font-size: 16px;
+            font-weight: 300;
+            padding: 8px 12px;
+            border-radius: 4px;
+            text-align: center;
+            margin-bottom: 8px;
+        }
+        
+        .highly-enriched {
+            background: rgba(229, 115, 115, 0.1);
+            color: #e57373;
+            border: 1px solid rgba(229, 115, 115, 0.2);
+        }
+        
+        .enriched {
+            background: rgba(255, 183, 77, 0.1);
+            color: #ffb74d;
+            border: 1px solid rgba(255, 183, 77, 0.2);
+        }
+        
+        .neutral {
+            background: rgba(189, 189, 189, 0.1);
+            color: #bdbdbd;
+            border: 1px solid rgba(189, 189, 189, 0.2);
+        }
+        
+        .depleted {
+            background: rgba(100, 181, 246, 0.1);
+            color: #64b5f6;
+            border: 1px solid rgba(100, 181, 246, 0.2);
+        }
+        
+        .confidence-meter {
+            height: 4px;
+            background: #1a1a1a;
+            border-radius: 2px;
+            overflow: hidden;
+            margin-top: 10px;
+        }
+        
+        .confidence-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #333, #666);
+            transition: width 0.5s ease;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-top: 20px;
+        }
+        
+        .stat-box {
+            background: #0f0f0f;
+            border: 1px solid #1a1a1a;
+            border-radius: 4px;
+            padding: 10px;
+            text-align: center;
+        }
+        
+        .stat-label {
+            font-size: 9px;
+            color: #666;
+            text-transform: uppercase;
+            margin-bottom: 5px;
+        }
+        
+        .stat-value {
+            font-size: 18px;
+            font-weight: 300;
+            color: #fff;
+        }
+        
+        /* Control Bar */
+        .control-bar {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(10, 10, 10, 0.95);
+            border: 1px solid #222;
+            border-radius: 4px;
+            padding: 10px 20px;
+            display: flex;
+            gap: 15px;
+            align-items: center;
+            backdrop-filter: blur(10px);
+            z-index: 100;
+        }
+        
+        button {
+            background: #141414;
+            border: 1px solid #2a2a2a;
+            color: #888;
+            padding: 6px 14px;
+            border-radius: 3px;
+            font-size: 11px;
+            cursor: pointer;
+            transition: all 0.2s ease;
+        }
+        
+        button:hover {
+            background: #1a1a1a;
+            color: #aaa;
+            border-color: #333;
+        }
+        
+        button.active {
+            background: #222;
+            color: #fff;
+            border-color: #444;
+        }
+        
+        .status-light {
+            width: 6px;
+            height: 6px;
+            border-radius: 50%;
+            background: #4caf50;
+            animation: statusPulse 2s ease infinite;
+        }
+        
+        @keyframes statusPulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.5; }
+        }
+        
+        .visualization-modes {
+            display: flex;
+            gap: 5px;
+            padding: 0 10px;
+            border-left: 1px solid #333;
+        }
+    </style>
+</head>
+<body>
+    <div class="main-container">
+        <!-- Left Panel: Sequence Stream -->
+        <div class="panel" id="sequence-panel">
+            <h2>Sequence Stream</h2>
+            <div id="sequence-list"></div>
+        </div>
+        
+        <!-- Center: 3D DNA Visualization -->
+        <div class="panel" id="viz-container">
+            <canvas id="dna-canvas"></canvas>
+            
+            <div class="reconstruction-overlay">
+                <div class="reconstruction-title">DNABERT Analysis</div>
+                <div class="reconstruction-progress" id="reconstruction"></div>
+                <div class="ai-thinking" id="ai-status">
+                    <span>Analyzing genomic features</span>
+                    <div class="thinking-dot"></div>
+                    <div class="thinking-dot"></div>
+                    <div class="thinking-dot"></div>
+                </div>
+            </div>
+            
+            <div class="control-bar">
+                <div class="status-light"></div>
+                <button id="play-btn" class="active">Auto Process</button>
+                <button id="speed-btn">Speed: Normal</button>
+                <div class="visualization-modes">
+                    <button id="mode-helix" class="active">Helix</button>
+                    <button id="mode-surface">Surface</button>
+                    <button id="mode-ladder">Ladder</button>
+                </div>
+                <button id="rotate-btn" class="active">Rotate</button>
+            </div>
+        </div>
+        
+        <!-- Right Panel: Analysis Results -->
+        <div class="panel" id="results-panel">
+            <h2>DNABERT Results</h2>
+            
+            <div class="classification-result">
+                <div class="classification-label">Classification</div>
+                <div class="classification-value" id="classification">-</div>
+                <div class="classification-label" style="margin-top: 10px;">Confidence</div>
+                <div class="confidence-meter">
+                    <div class="confidence-fill" id="confidence" style="width: 0%"></div>
+                </div>
+                <div style="text-align: right; font-size: 10px; color: #666; margin-top: 5px;">
+                    <span id="confidence-text">0%</span>
+                </div>
+            </div>
+            
+            <div class="stats-grid">
+                <div class="stat-box">
+                    <div class="stat-label">Processed</div>
+                    <div class="stat-value" id="processed">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Unique</div>
+                    <div class="stat-value" id="unique">0</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">GC Content</div>
+                    <div class="stat-value" id="gc-content">-</div>
+                </div>
+                <div class="stat-box">
+                    <div class="stat-label">Z-Score</div>
+                    <div class="stat-value" id="z-score">-</div>
+                </div>
+            </div>
+            
+            <h2 style="margin-top: 30px;">Distribution</h2>
+            <canvas id="distribution-chart" width="260" height="120"></canvas>
+        </div>
+    </div>
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.128.0/examples/js/controls/OrbitControls.js"></script>
+    <script>
+        // Global state
+        const API_URL = 'http://localhost:8000';
+        let sequences = [];
+        let currentIndex = 0;
+        let processedCount = 0;
+        let uniqueBarcodes = new Set();
+        let isAutoProcessing = true;
+        let speed = 1000;
+        let classifications = {};
+        
+        // Three.js variables
+        let scene, camera, renderer, controls;
+        let dnaGroup, helixGroup;
+        let currentSequence = null;
+        let visualizationMode = 'helix';
+        let isRotating = true;
+        
+        // Initialize 3D visualization
+        function init3D() {
+            const container = document.getElementById('viz-container');
+            const canvas = document.getElementById('dna-canvas');
+            
+            // Scene
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x000000);
+            scene.fog = new THREE.Fog(0x000000, 50, 200);
+            
+            // Camera
+            const width = container.clientWidth;
+            const height = container.clientHeight;
+            camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
+            camera.position.set(30, 20, 40);
+            
+            // Renderer
+            renderer = new THREE.WebGLRenderer({ 
+                canvas: canvas,
+                antialias: true,
+                alpha: true
+            });
+            renderer.setSize(width, height);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            
+            // Controls
+            controls = new THREE.OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.autoRotate = isRotating;
+            controls.autoRotateSpeed = 0.5;
+            
+            // Lighting
+            const ambientLight = new THREE.AmbientLight(0x404040, 0.5);
+            scene.add(ambientLight);
+            
+            const keyLight = new THREE.DirectionalLight(0xffffff, 0.6);
+            keyLight.position.set(30, 30, 30);
+            scene.add(keyLight);
+            
+            const fillLight = new THREE.DirectionalLight(0x4444ff, 0.2);
+            fillLight.position.set(-20, 20, -20);
+            scene.add(fillLight);
+            
+            // Initialize DNA group
+            dnaGroup = new THREE.Group();
+            scene.add(dnaGroup);
+            
+            // Handle resize
+            window.addEventListener('resize', () => {
+                const width = container.clientWidth;
+                const height = container.clientHeight;
+                camera.aspect = width / height;
+                camera.updateProjectionMatrix();
+                renderer.setSize(width, height);
+            });
+            
+            animate();
+        }
+        
+        // Create 3D DNA structure from sequence
+        function create3DDNA(sequence, reconstructionProgress = 1.0) {
+            // Clear existing DNA
+            dnaGroup.clear();
+            
+            const bases = sequence.split('');
+            const numBases = Math.floor(bases.length * reconstructionProgress);
+            
+            // DNA parameters
+            const rise = 3.4;
+            const twist = 36;
+            const radius = 10;
+            
+            // Colors for bases
+            const baseColors = {
+                'A': 0xe57373,
+                'T': 0x64b5f6,
+                'G': 0xfff59d,
+                'C': 0x81c784
+            };
+            
+            // Create helix group
+            helixGroup = new THREE.Group();
+            
+            if (visualizationMode === 'helix' || visualizationMode === 'ladder') {
+                // Create backbone curves
+                const backbone1Points = [];
+                const backbone2Points = [];
+                
+                for (let i = 0; i <= numBases; i++) {
+                    const angle1 = (i * twist * Math.PI / 180);
+                    const angle2 = angle1 + Math.PI;
+                    const y = i * rise - (numBases * rise) / 2;
+                    
+                    backbone1Points.push(new THREE.Vector3(
+                        radius * Math.cos(angle1),
+                        y,
+                        radius * Math.sin(angle1)
+                    ));
+                    
+                    backbone2Points.push(new THREE.Vector3(
+                        radius * Math.cos(angle2),
+                        y,
+                        radius * Math.sin(angle2)
+                    ));
+                }
+                
+                if (visualizationMode === 'helix' && backbone1Points.length > 1) {
+                    // Create backbone tubes
+                    const curve1 = new THREE.CatmullRomCurve3(backbone1Points);
+                    const curve2 = new THREE.CatmullRomCurve3(backbone2Points);
+                    
+                    const tubeGeometry1 = new THREE.TubeGeometry(curve1, numBases * 4, 0.3, 8);
+                    const tubeGeometry2 = new THREE.TubeGeometry(curve2, numBases * 4, 0.3, 8);
+                    
+                    const backboneMaterial = new THREE.MeshPhongMaterial({
+                        color: 0x404040,
+                        emissive: 0x101010,
+                        shininess: 100
+                    });
+                    
+                    helixGroup.add(new THREE.Mesh(tubeGeometry1, backboneMaterial));
+                    helixGroup.add(new THREE.Mesh(tubeGeometry2, backboneMaterial));
+                }
+            }
+            
+            // Add base pairs
+            for (let i = 0; i < numBases; i++) {
+                const base = bases[i];
+                const angle = i * twist * Math.PI / 180;
+                const y = i * rise - (numBases * rise) / 2;
+                
+                // Create base representation
+                const baseGeometry = new THREE.SphereGeometry(1.2, 16, 16);
+                const baseMaterial = new THREE.MeshPhongMaterial({
+                    color: baseColors[base],
+                    emissive: baseColors[base],
+                    emissiveIntensity: 0.2
+                });
+                
+                // Position bases
+                const base1 = new THREE.Mesh(baseGeometry, baseMaterial);
+                base1.position.set(
+                    radius * 0.7 * Math.cos(angle),
+                    y,
+                    radius * 0.7 * Math.sin(angle)
+                );
+                
+                const base2 = new THREE.Mesh(baseGeometry, baseMaterial.clone());
+                base2.position.set(
+                    radius * 0.7 * Math.cos(angle + Math.PI),
+                    y,
+                    radius * 0.7 * Math.sin(angle + Math.PI)
+                );
+                
+                helixGroup.add(base1);
+                helixGroup.add(base2);
+                
+                // Add hydrogen bonds
+                if (visualizationMode === 'helix' || visualizationMode === 'ladder') {
+                    const bondGeometry = new THREE.CylinderGeometry(0.05, 0.05, radius * 1.2);
+                    const bondMaterial = new THREE.MeshBasicMaterial({
+                        color: 0xffffff,
+                        opacity: 0.2,
+                        transparent: true
+                    });
+                    const bond = new THREE.Mesh(bondGeometry, bondMaterial);
+                    bond.position.y = y;
+                    bond.rotation.z = Math.PI / 2;
+                    bond.rotation.y = angle;
+                    helixGroup.add(bond);
+                }
+            }
+            
+            // Add surface representation
+            if (visualizationMode === 'surface') {
+                const geometry = new THREE.CylinderGeometry(
+                    radius - 2, radius - 2,
+                    numBases * rise,
+                    32, numBases * 2
+                );
+                const material = new THREE.MeshPhongMaterial({
+                    color: 0x222222,
+                    transparent: true,
+                    opacity: 0.3,
+                    side: THREE.DoubleSide
+                });
+                const surface = new THREE.Mesh(geometry, material);
+                helixGroup.add(surface);
+            }
+            
+            dnaGroup.add(helixGroup);
+        }
+        
+        // Load sequences from API
+        async function loadSequences() {
+            try {
+                const response = await fetch(`${API_URL}/api/sequences/top?limit=50`);
+                sequences = await response.json();
+                displaySequences();
+                if (sequences.length > 0 && isAutoProcessing) {
+                    processNextSequence();
+                }
+            } catch (error) {
+                console.error('Error loading sequences:', error);
+            }
+        }
+        
+        // Display sequences in left panel
+        function displaySequences() {
+            const list = document.getElementById('sequence-list');
+            list.innerHTML = sequences.slice(0, 15).map((seq, idx) => `
+                <div class="sequence-card" id="seq-${idx}" data-index="${idx}">
+                    <div class="barcode-display">${colorizeSequence(seq.barcode)}</div>
+                    <div class="sequence-meta">
+                        <div class="meta-item">
+                            <span>Count:</span>
+                            <span class="meta-value">${seq.count}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span>Z-score:</span>
+                            <span class="meta-value">${seq.z_score.toFixed(2)}</span>
+                        </div>
+                        <div class="meta-item">
+                            <span>GC:</span>
+                            <span class="meta-value">${seq.gc_content.toFixed(0)}%</span>
+                        </div>
+                        <div class="meta-item">
+                            <span>Length:</span>
+                            <span class="meta-value">${seq.length}</span>
+                        </div>
+                    </div>
+                </div>
+            `).join('');
+            
+            // Add click handlers
+            document.querySelectorAll('.sequence-card').forEach(card => {
+                card.addEventListener('click', () => {
+                    const idx = parseInt(card.dataset.index);
+                    currentIndex = idx;
+                    processSequence(sequences[idx]);
+                });
+            });
+        }
+        
+        function colorizeSequence(sequence) {
+            return sequence.split('').map(base => 
+                `<span class="base-${base}">${base}</span>`
+            ).join('');
+        }
+        
+        // Process next sequence automatically
+        async function processNextSequence() {
+            if (!isAutoProcessing || currentIndex >= sequences.length) {
+                if (currentIndex >= sequences.length) {
+                    currentIndex = 0; // Loop
+                }
+                return;
+            }
+            
+            await processSequence(sequences[currentIndex]);
+            currentIndex++;
+            
+            setTimeout(() => processNextSequence(), speed);
+        }
+        
+        // Process a single sequence
+        async function processSequence(seq) {
+            currentSequence = seq;
+            
+            // Update UI to show processing
+            document.querySelectorAll('.sequence-card').forEach(card => {
+                card.classList.remove('processing', 'processed');
+            });
+            
+            const card = document.getElementById(`seq-${currentIndex % 15}`);
+            if (card) {
+                card.classList.add('processing');
+                card.scrollIntoView({ behavior: 'smooth', block: 'center' });
+            }
+            
+            // Show reconstruction animation
+            await reconstructSequence(seq.barcode);
+            
+            // Call AI classification
+            try {
+                const response = await fetch(`${API_URL}/api/classify`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        barcode: seq.barcode,
+                        count: seq.count,
+                        z_score: seq.z_score
+                    })
+                });
+                
+                const result = await response.json();
+                
+                // Update classification display
+                displayClassification(result);
+                
+                // Store classification
+                classifications[seq.barcode] = result.classification;
+                
+                // Mark as processed
+                if (card) {
+                    card.classList.remove('processing');
+                    card.classList.add('processed');
+                }
+                
+            } catch (error) {
+                console.error('Classification error:', error);
+            }
+            
+            // Update statistics
+            processedCount++;
+            uniqueBarcodes.add(seq.barcode);
+            updateStatistics(seq);
+        }
+        
+        // Reconstruct sequence animation
+        async function reconstructSequence(sequence) {
+            const reconstructDiv = document.getElementById('reconstruction');
+            const bases = sequence.split('');
+            
+            // Clear previous reconstruction
+            reconstructDiv.innerHTML = '';
+            
+            // Show AI thinking
+            document.getElementById('ai-status').style.display = 'flex';
+            
+            // Animate reconstruction base by base
+            for (let i = 0; i < bases.length; i++) {
+                const baseBlock = document.createElement('div');
+                baseBlock.className = `base-block base-${bases[i]}`;
+                baseBlock.textContent = bases[i];
+                baseBlock.style.background = getBaseColor(bases[i], 0.2);
+                baseBlock.style.color = getBaseColor(bases[i], 1);
+                reconstructDiv.appendChild(baseBlock);
+                
+                // Update 3D model progressively
+                create3DDNA(sequence, (i + 1) / bases.length);
+                
+                await sleep(50); // Delay for animation
+                
+                baseBlock.classList.add('reconstructed');
+            }
+            
+            // Hide AI thinking
+            document.getElementById('ai-status').style.display = 'none';
+        }
+        
+        function getBaseColor(base, opacity = 1) {
+            const colors = {
+                'A': `rgba(229, 115, 115, ${opacity})`,
+                'T': `rgba(100, 181, 246, ${opacity})`,
+                'G': `rgba(255, 245, 157, ${opacity})`,
+                'C': `rgba(129, 199, 132, ${opacity})`
+            };
+            return colors[base] || `rgba(100, 100, 100, ${opacity})`;
+        }
+        
+        // Display classification result
+        function displayClassification(result) {
+            const classDiv = document.getElementById('classification');
+            const className = result.classification.toLowerCase().replace('_', '-');
+            
+            classDiv.className = `classification-value ${className}`;
+            classDiv.textContent = result.classification.replace('_', ' ');
+            
+            // Update confidence
+            const confidence = result.confidence * 100;
+            document.getElementById('confidence').style.width = `${confidence}%`;
+            document.getElementById('confidence-text').textContent = `${confidence.toFixed(0)}%`;
+            
+            updateDistributionChart();
+        }
+        
+        // Update statistics
+        function updateStatistics(seq) {
+            document.getElementById('processed').textContent = processedCount;
+            document.getElementById('unique').textContent = uniqueBarcodes.size;
+            document.getElementById('gc-content').textContent = `${seq.gc_content.toFixed(0)}%`;
+            document.getElementById('z-score').textContent = seq.z_score.toFixed(2);
+        }
+        
+        // Update distribution chart
+        function updateDistributionChart() {
+            const canvas = document.getElementById('distribution-chart');
+            const ctx = canvas.getContext('2d');
+            
+            // Count classifications
+            const counts = {};
+            Object.values(classifications).forEach(c => {
+                counts[c] = (counts[c] || 0) + 1;
+            });
+            
+            // Clear canvas
+            ctx.clearRect(0, 0, canvas.width, canvas.height);
+            
+            // Draw bars
+            const categories = ['HIGHLY_ENRICHED', 'ENRICHED', 'NEUTRAL', 'DEPLETED', 'HIGHLY_DEPLETED'];
+            const barWidth = canvas.width / categories.length;
+            const maxCount = Math.max(...Object.values(counts), 1);
+            
+            categories.forEach((cat, i) => {
+                const count = counts[cat] || 0;
+                const height = (count / maxCount) * (canvas.height - 20);
+                
+                ctx.fillStyle = getCategoryColor(cat);
+                ctx.fillRect(
+                    i * barWidth + 5,
+                    canvas.height - height - 10,
+                    barWidth - 10,
+                    height
+                );
+                
+                // Label
+                ctx.fillStyle = '#666';
+                ctx.font = '9px sans-serif';
+                ctx.textAlign = 'center';
+                ctx.fillText(
+                    cat.split('_')[0].substr(0, 4),
+                    i * barWidth + barWidth / 2,
+                    canvas.height
+                );
+            });
+        }
+        
+        function getCategoryColor(category) {
+            const colors = {
+                'HIGHLY_ENRICHED': 'rgba(229, 115, 115, 0.8)',
+                'ENRICHED': 'rgba(255, 183, 77, 0.8)',
+                'NEUTRAL': 'rgba(189, 189, 189, 0.8)',
+                'DEPLETED': 'rgba(100, 181, 246, 0.8)',
+                'HIGHLY_DEPLETED': 'rgba(63, 81, 181, 0.8)'
+            };
+            return colors[category] || 'rgba(100, 100, 100, 0.8)';
+        }
+        
+        // Animation loop
+        function animate() {
+            requestAnimationFrame(animate);
+            
+            if (controls) {
+                controls.update();
+            }
+            
+            if (renderer && scene && camera) {
+                renderer.render(scene, camera);
+            }
+        }
+        
+        // Utility function
+        function sleep(ms) {
+            return new Promise(resolve => setTimeout(resolve, ms));
+        }
+        
+        // Control handlers
+        document.getElementById('play-btn').addEventListener('click', function() {
+            isAutoProcessing = !isAutoProcessing;
+            this.textContent = isAutoProcessing ? 'Auto Process' : 'Manual';
+            this.classList.toggle('active');
+            if (isAutoProcessing) {
+                processNextSequence();
+            }
+        });
+        
+        document.getElementById('speed-btn').addEventListener('click', function() {
+            const speeds = [2000, 1000, 500];
+            const labels = ['Slow', 'Normal', 'Fast'];
+            let currentSpeed = speeds.indexOf(speed);
+            currentSpeed = (currentSpeed + 1) % speeds.length;
+            speed = speeds[currentSpeed];
+            this.textContent = `Speed: ${labels[currentSpeed]}`;
+        });
+        
+        document.getElementById('rotate-btn').addEventListener('click', function() {
+            isRotating = !isRotating;
+            if (controls) {
+                controls.autoRotate = isRotating;
+            }
+            this.classList.toggle('active');
+        });
+        
+        // Visualization mode buttons
+        document.getElementById('mode-helix').addEventListener('click', function() {
+            visualizationMode = 'helix';
+            updateModeButtons(this);
+            if (currentSequence) {
+                create3DDNA(currentSequence.barcode, 1.0);
+            }
+        });
+        
+        document.getElementById('mode-surface').addEventListener('click', function() {
+            visualizationMode = 'surface';
+            updateModeButtons(this);
+            if (currentSequence) {
+                create3DDNA(currentSequence.barcode, 1.0);
+            }
+        });
+        
+        document.getElementById('mode-ladder').addEventListener('click', function() {
+            visualizationMode = 'ladder';
+            updateModeButtons(this);
+            if (currentSequence) {
+                create3DDNA(currentSequence.barcode, 1.0);
+            }
+        });
+        
+        function updateModeButtons(active) {
+            document.querySelectorAll('.visualization-modes button').forEach(btn => {
+                btn.classList.remove('active');
+            });
+            active.classList.add('active');
+        }
+        
+        // Initialize
+        init3D();
+        loadSequences();
+    </script>
+</body>
+</html>

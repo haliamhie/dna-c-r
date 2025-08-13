@@ -48,10 +48,39 @@ CLAUDE.md
 *~
 .DS_Store
 
-# Environment variables
+# Environment variables and API Keys - CRITICAL
 .env
 .env.local
 .env.*.local
+.env.production
+*.env
+*api_key*
+*API_KEY*
+nvapi-*
+credentials.json
+secrets.yaml
+api_keys.txt
+
+# Cache directories
+cache/
+ai_cache/
+backend/cache/
+backend/dnabert_cache/
+*.cache
+ai_results/
+models/
+*.pkl
+*.joblib
+
+# Archive and test files
+archive/
+test_*.html
+test_*.py
+updated.zip
+updated_data/
+benchmark_report.json
+*.service
+deploy.sh
 
 # Temporary files
 *.tmp

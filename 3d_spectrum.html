@@ -1,0 +1,600 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>3D DNA Spectrum - Living Data Architecture</title>
+<style>
+body {
+  margin: 0;
+  background: #000;
+  overflow: hidden;
+  font-family: 'Courier New', monospace;
+}
+#info {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  color: #fff;
+  font-size: 11px;
+  background: rgba(0,0,0,0.5);
+  padding: 10px;
+  border-radius: 5px;
+  backdrop-filter: blur(10px);
+  z-index: 100;
+}
+.metric {
+  margin: 3px 0;
+  transition: color 0.3s;
+}
+.metric span {
+  font-weight: bold;
+  text-shadow: 0 0 5px currentColor;
+}
+#legend {
+  position: absolute;
+  bottom: 10px;
+  right: 10px;
+  color: #fff;
+  font-size: 10px;
+  background: rgba(0,0,0,0.5);
+  padding: 8px;
+  border-radius: 5px;
+  backdrop-filter: blur(10px);
+  z-index: 100;
+}
+</style>
+</head>
+<body>
+<div id="info">
+  <div class="metric">SEQUENCES: <span id="seq-count" style="color: #00ffff">0</span></div>
+  <div class="metric">ENRICHMENT: <span id="enrichment" style="color: #ff00ff">0</span></div>
+  <div class="metric">COVERAGE: <span id="coverage" style="color: #ffff00">0x</span></div>
+  <div class="metric">HAMMING: <span id="hamming" style="color: #00ff00">4</span></div>
+  <div class="metric">SUCCESS: <span id="success" style="color: #ff8800">44.5%</span></div>
+  <div class="metric">Z-SCORE: <span id="zscore" style="color: #ff0088">0.00</span></div>
+</div>
+<div id="legend">
+  <div style="color: #ff0000">A: Adenine</div>
+  <div style="color: #0088ff">T: Thymine</div>
+  <div style="color: #ffff00">G: Guanine</div>
+  <div style="color: #00ff88">C: Cytosine</div>
+  <div style="color: #ff00ff">● High Enrichment</div>
+  <div style="color: #00ffff">● Low Coverage</div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// Real data from analysis
+const BARCODES = [
+  {seq: "GTCTTTCTGCTCGT", count: 899, zscore: 8.11},
+  {seq: "GGCGCTTCATGGTC", count: 861, zscore: 7.38},
+  {seq: "GGAATCGTATCCGT", count: 797, zscore: 6.16},
+  {seq: "TGCCGTCCGCGCTC", count: 730, zscore: 4.88},
+  {seq: "ACGTCTTTGTCCCG", count: 704, zscore: 4.38},
+  {seq: "CAGTCATCCCGCGT", count: 701, zscore: 4.33},
+  {seq: "CTGCCTGTTCGATC", count: 677, zscore: 3.87},
+  {seq: "GACATAGGGGGCCC", count: 675, zscore: 3.83}
+];
+
+// Color functions
+function baseToColor(base) {
+  switch(base) {
+    case 'A': return new THREE.Color(1, 0, 0);      // Red
+    case 'T': return new THREE.Color(0, 0.5, 1);    // Blue
+    case 'G': return new THREE.Color(1, 1, 0);      // Yellow
+    case 'C': return new THREE.Color(0, 1, 0.5);    // Cyan-Green
+    default: return new THREE.Color(0.5, 0.5, 0.5);
+  }
+}
+
+function zscoreToColor(zscore) {
+  // Gradient from blue (low) to purple to magenta to orange to gold (high)
+  const normalized = Math.min(Math.max(zscore / 10, 0), 1);
+  const hue = 240 - normalized * 280; // Blue to orange spectrum
+  const saturation = 0.8 + normalized * 0.2;
+  const lightness = 0.4 + normalized * 0.3;
+  return new THREE.Color().setHSL(hue / 360, saturation, lightness);
+}
+
+function coverageToColor(coverage) {
+  // Heat map: blue -> cyan -> green -> yellow -> orange -> red
+  const normalized = Math.min(coverage / 1000, 1);
+  let r, g, b;
+  
+  if (normalized < 0.2) {
+    // Blue to cyan
+    const t = normalized * 5;
+    r = 0;
+    g = t;
+    b = 1;
+  } else if (normalized < 0.4) {
+    // Cyan to green
+    const t = (normalized - 0.2) * 5;
+    r = 0;
+    g = 1;
+    b = 1 - t;
+  } else if (normalized < 0.6) {
+    // Green to yellow
+    const t = (normalized - 0.4) * 5;
+    r = t;
+    g = 1;
+    b = 0;
+  } else if (normalized < 0.8) {
+    // Yellow to orange
+    const t = (normalized - 0.6) * 5;
+    r = 1;
+    g = 1 - t * 0.5;
+    b = 0;
+  } else {
+    // Orange to red
+    const t = (normalized - 0.8) * 5;
+    r = 1;
+    g = 0.5 - t * 0.5;
+    b = 0;
+  }
+  
+  return new THREE.Color(r, g, b);
+}
+
+// Initialize Three.js
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x000011, 0.0008);
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+camera.position.set(0, 0, 500);
+
+const renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+document.body.appendChild(renderer.domElement);
+
+// Lighting
+const ambientLight = new THREE.AmbientLight(0x222244, 0.5);
+scene.add(ambientLight);
+
+const pointLight1 = new THREE.PointLight(0xff00ff, 1, 500);
+pointLight1.position.set(200, 200, 200);
+scene.add(pointLight1);
+
+const pointLight2 = new THREE.PointLight(0x00ffff, 1, 500);
+pointLight2.position.set(-200, -200, 200);
+scene.add(pointLight2);
+
+const pointLight3 = new THREE.PointLight(0xffff00, 0.5, 300);
+pointLight3.position.set(0, 0, 300);
+scene.add(pointLight3);
+
+// 3D DNA Helix Class
+class DNAHelix3D {
+  constructor(sequence, index) {
+    this.sequence = sequence.seq;
+    this.zscore = sequence.zscore;
+    this.group = new THREE.Group();
+    
+    const radius = 20;
+    const height = 200;
+    const turns = 2;
+    const segments = this.sequence.length * 4;
+    
+    // Create double helix geometry
+    const strand1Points = [];
+    const strand2Points = [];
+    const colors1 = [];
+    const colors2 = [];
+    
+    for (let i = 0; i <= segments; i++) {
+      const t = i / segments;
+      const angle = t * Math.PI * 2 * turns;
+      const y = (t - 0.5) * height;
+      
+      // Strand 1
+      const x1 = Math.cos(angle) * radius;
+      const z1 = Math.sin(angle) * radius;
+      strand1Points.push(new THREE.Vector3(x1, y, z1));
+      
+      // Strand 2 (offset by PI)
+      const x2 = Math.cos(angle + Math.PI) * radius;
+      const z2 = Math.sin(angle + Math.PI) * radius;
+      strand2Points.push(new THREE.Vector3(x2, y, z2));
+      
+      // Color based on base
+      const baseIndex = Math.floor(t * this.sequence.length) % this.sequence.length;
+      const base = this.sequence[baseIndex];
+      const color = baseToColor(base);
+      colors1.push(color.r, color.g, color.b);
+      colors2.push(color.r * 0.7, color.g * 0.7, color.b * 0.7);
+    }
+    
+    // Create tube geometries
+    const curve1 = new THREE.CatmullRomCurve3(strand1Points);
+    const curve2 = new THREE.CatmullRomCurve3(strand2Points);
+    
+    const tubeGeometry1 = new THREE.TubeGeometry(curve1, segments, 2, 8, false);
+    const tubeGeometry2 = new THREE.TubeGeometry(curve2, segments, 2, 8, false);
+    
+    // Create gradient material
+    const material1 = new THREE.MeshPhongMaterial({
+      color: zscoreToColor(this.zscore),
+      emissive: zscoreToColor(this.zscore),
+      emissiveIntensity: 0.2,
+      shininess: 100,
+      transparent: true,
+      opacity: 0.8
+    });
+    
+    const material2 = new THREE.MeshPhongMaterial({
+      color: zscoreToColor(this.zscore * 0.7),
+      emissive: zscoreToColor(this.zscore * 0.7),
+      emissiveIntensity: 0.1,
+      shininess: 100,
+      transparent: true,
+      opacity: 0.6
+    });
+    
+    const mesh1 = new THREE.Mesh(tubeGeometry1, material1);
+    const mesh2 = new THREE.Mesh(tubeGeometry2, material2);
+    
+    this.group.add(mesh1);
+    this.group.add(mesh2);
+    
+    // Add base pair connections
+    for (let i = 0; i < this.sequence.length; i++) {
+      const t = i / this.sequence.length;
+      const angle = t * Math.PI * 2 * turns;
+      const y = (t - 0.5) * height;
+      
+      const x1 = Math.cos(angle) * radius;
+      const z1 = Math.sin(angle) * radius;
+      const x2 = Math.cos(angle + Math.PI) * radius;
+      const z2 = Math.sin(angle + Math.PI) * radius;
+      
+      const geometry = new THREE.BufferGeometry().setFromPoints([
+        new THREE.Vector3(x1, y, z1),
+        new THREE.Vector3(x2, y, z2)
+      ]);
+      
+      const base = this.sequence[i];
+      const lineColor = baseToColor(base);
+      const material = new THREE.LineBasicMaterial({
+        color: lineColor,
+        transparent: true,
+        opacity: 0.5
+      });
+      
+      const line = new THREE.Line(geometry, material);
+      this.group.add(line);
+    }
+    
+    // Position in 3D space
+    this.group.position.set(
+      (index % 3 - 1) * 150,
+      (Math.floor(index / 3) - 1) * 100,
+      (index % 2) * 100 - 50
+    );
+    
+    this.rotationSpeed = 0.001 + index * 0.0002;
+  }
+  
+  update() {
+    this.group.rotation.y += this.rotationSpeed;
+    this.group.position.z = Math.sin(Date.now() * 0.0001 + this.group.position.x) * 50;
+  }
+}
+
+// Particle Cloud System
+class ParticleCloud {
+  constructor(count) {
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+    const sizes = new Float32Array(count);
+    
+    this.velocities = [];
+    this.barcodes = [];
+    
+    for (let i = 0; i < count; i++) {
+      // Random position in 3D space
+      positions[i * 3] = (Math.random() - 0.5) * 800;
+      positions[i * 3 + 1] = (Math.random() - 0.5) * 600;
+      positions[i * 3 + 2] = (Math.random() - 0.5) * 400;
+      
+      // Velocity
+      this.velocities.push({
+        x: (Math.random() - 0.5) * 2,
+        y: (Math.random() - 0.5) * 2,
+        z: (Math.random() - 0.5) * 2
+      });
+      
+      // Assign barcode and color
+      const barcode = BARCODES[Math.floor(Math.random() * BARCODES.length)];
+      this.barcodes.push(barcode);
+      
+      // Multi-dimensional color
+      const success = Math.random() < 0.445;
+      const enriched = barcode.zscore > 4;
+      const coverage = Math.random() * 1000;
+      
+      let color;
+      if (enriched) {
+        color = zscoreToColor(barcode.zscore);
+      } else if (success) {
+        color = coverageToColor(coverage);
+      } else {
+        // Failure - gradient from violet to crimson
+        const t = Math.random();
+        color = new THREE.Color().lerpColors(
+          new THREE.Color(0.5, 0, 1),  // Violet
+          new THREE.Color(1, 0, 0.2),  // Crimson
+          t
+        );
+      }
+      
+      colors[i * 3] = color.r;
+      colors[i * 3 + 1] = color.g;
+      colors[i * 3 + 2] = color.b;
+      
+      sizes[i] = enriched ? 8 : 3;
+    }
+    
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+    
+    const material = new THREE.PointsMaterial({
+      size: 5,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.8,
+      blending: THREE.AdditiveBlending,
+      depthWrite: false,
+      sizeAttenuation: true
+    });
+    
+    this.points = new THREE.Points(geometry, material);
+    this.geometry = geometry;
+  }
+  
+  update() {
+    const positions = this.geometry.attributes.position.array;
+    const colors = this.geometry.attributes.color.array;
+    
+    for (let i = 0; i < positions.length / 3; i++) {
+      // Update positions
+      positions[i * 3] += this.velocities[i].x;
+      positions[i * 3 + 1] += this.velocities[i].y;
+      positions[i * 3 + 2] += this.velocities[i].z;
+      
+      // Wrap around
+      if (Math.abs(positions[i * 3]) > 400) this.velocities[i].x *= -1;
+      if (Math.abs(positions[i * 3 + 1]) > 300) this.velocities[i].y *= -1;
+      if (Math.abs(positions[i * 3 + 2]) > 200) this.velocities[i].z *= -1;
+      
+      // Color shift based on Z position (depth-based coloring)
+      const z = positions[i * 3 + 2];
+      const depthFactor = (z + 200) / 400; // Normalize to 0-1
+      
+      // Apply iridescent effect
+      const time = Date.now() * 0.001;
+      const hueShift = Math.sin(time + i * 0.1) * 0.1;
+      const color = new THREE.Color(colors[i * 3], colors[i * 3 + 1], colors[i * 3 + 2]);
+      color.offsetHSL(hueShift, 0, depthFactor * 0.2 - 0.1);
+      
+      colors[i * 3] = color.r;
+      colors[i * 3 + 1] = color.g;
+      colors[i * 3 + 2] = color.b;
+    }
+    
+    this.geometry.attributes.position.needsUpdate = true;
+    this.geometry.attributes.color.needsUpdate = true;
+  }
+}
+
+// 3D Network
+class Network3D {
+  constructor(nodeCount) {
+    this.nodes = [];
+    this.connections = [];
+    
+    // Create nodes
+    for (let i = 0; i < nodeCount; i++) {
+      const geometry = new THREE.SphereGeometry(3, 16, 16);
+      const barcode = BARCODES[i % BARCODES.length];
+      const color = zscoreToColor(barcode.zscore);
+      
+      const material = new THREE.MeshPhongMaterial({
+        color: color,
+        emissive: color,
+        emissiveIntensity: 0.5,
+        transparent: true,
+        opacity: 0.9
+      });
+      
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(
+        (Math.random() - 0.5) * 300,
+        (Math.random() - 0.5) * 300,
+        (Math.random() - 0.5) * 300
+      );
+      
+      this.nodes.push({
+        mesh: mesh,
+        velocity: new THREE.Vector3(
+          (Math.random() - 0.5) * 0.5,
+          (Math.random() - 0.5) * 0.5,
+          (Math.random() - 0.5) * 0.5
+        ),
+        barcode: barcode
+      });
+    }
+    
+    // Create connections
+    this.lineGeometry = new THREE.BufferGeometry();
+    this.updateConnections();
+    
+    const lineMaterial = new THREE.LineBasicMaterial({
+      color: 0x00ffff,
+      transparent: true,
+      opacity: 0.2,
+      blending: THREE.AdditiveBlending
+    });
+    
+    this.lines = new THREE.LineSegments(this.lineGeometry, lineMaterial);
+  }
+  
+  updateConnections() {
+    const positions = [];
+    
+    for (let i = 0; i < this.nodes.length; i++) {
+      for (let j = i + 1; j < this.nodes.length; j++) {
+        const dist = this.nodes[i].mesh.position.distanceTo(this.nodes[j].mesh.position);
+        if (dist < 100) {
+          positions.push(
+            this.nodes[i].mesh.position.x,
+            this.nodes[i].mesh.position.y,
+            this.nodes[i].mesh.position.z,
+            this.nodes[j].mesh.position.x,
+            this.nodes[j].mesh.position.y,
+            this.nodes[j].mesh.position.z
+          );
+        }
+      }
+    }
+    
+    this.lineGeometry.setAttribute('position', 
+      new THREE.Float32BufferAttribute(positions, 3));
+  }
+  
+  update() {
+    this.nodes.forEach(node => {
+      // Update position
+      node.mesh.position.add(node.velocity);
+      
+      // Boundary bounce
+      ['x', 'y', 'z'].forEach(axis => {
+        if (Math.abs(node.mesh.position[axis]) > 150) {
+          node.velocity[axis] *= -1;
+        }
+      });
+      
+      // Pulse effect
+      const scale = 1 + Math.sin(Date.now() * 0.001 + node.mesh.position.x) * 0.2;
+      node.mesh.scale.set(scale, scale, scale);
+      
+      // Rotate based on enrichment
+      node.mesh.rotation.x += 0.01 * node.barcode.zscore / 10;
+      node.mesh.rotation.y += 0.01 * node.barcode.zscore / 10;
+    });
+    
+    this.updateConnections();
+  }
+}
+
+// Initialize objects
+const helixes = BARCODES.slice(0, 6).map((seq, i) => new DNAHelix3D(seq, i));
+helixes.forEach(helix => scene.add(helix.group));
+
+const particleCloud = new ParticleCloud(2000);
+scene.add(particleCloud.points);
+
+const network = new Network3D(20);
+network.nodes.forEach(node => scene.add(node.mesh));
+scene.add(network.lines);
+
+// Statistics
+let seqCount = 0;
+let enrichmentLevel = 0;
+let coverageDepth = 0;
+
+// Mouse controls
+let mouseX = 0, mouseY = 0;
+document.addEventListener('mousemove', (e) => {
+  mouseX = (e.clientX / window.innerWidth) * 2 - 1;
+  mouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+});
+
+// Animation loop
+function animate() {
+  requestAnimationFrame(animate);
+  
+  // Update objects
+  helixes.forEach(helix => helix.update());
+  particleCloud.update();
+  network.update();
+  
+  // Camera orbit
+  const time = Date.now() * 0.0001;
+  camera.position.x = Math.cos(time + mouseX * Math.PI) * 500;
+  camera.position.z = Math.sin(time + mouseX * Math.PI) * 500;
+  camera.position.y = mouseY * 200;
+  camera.lookAt(scene.position);
+  
+  // Update lights
+  pointLight1.position.x = Math.sin(time * 2) * 300;
+  pointLight1.position.z = Math.cos(time * 2) * 300;
+  
+  pointLight2.position.x = Math.sin(time * 3 + Math.PI) * 300;
+  pointLight2.position.z = Math.cos(time * 3 + Math.PI) * 300;
+  
+  // Update stats
+  seqCount += Math.floor(Math.random() * 100);
+  enrichmentLevel = BARCODES[Math.floor(Math.random() * BARCODES.length)].count;
+  coverageDepth = Math.floor(Math.random() * 315) + 100;
+  
+  if (Math.random() < 0.1) {
+    document.getElementById('seq-count').textContent = seqCount.toLocaleString();
+    document.getElementById('enrichment').textContent = enrichmentLevel;
+    document.getElementById('coverage').textContent = coverageDepth + 'x';
+    document.getElementById('zscore').textContent = 
+      (Math.random() * 8).toFixed(2);
+    
+    // Update metric colors dynamically
+    document.getElementById('seq-count').style.color = 
+      `hsl(${(seqCount / 100) % 360}, 100%, 50%)`;
+    document.getElementById('enrichment').style.color = 
+      `hsl(${270 - enrichmentLevel / 10}, 100%, 50%)`;
+    document.getElementById('coverage').style.color = 
+      coverageToColor(coverageDepth).getStyle();
+  }
+  
+  renderer.render(scene, camera);
+}
+
+// Handle resize
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Start
+animate();
+
+// Keyboard controls
+document.addEventListener('keydown', (e) => {
+  if (e.key === ' ') {
+    // Space bar - burst effect
+    for (let i = 0; i < 100; i++) {
+      const geometry = new THREE.SphereGeometry(2, 8, 8);
+      const color = new THREE.Color().setHSL(Math.random(), 1, 0.5);
+      const material = new THREE.MeshBasicMaterial({
+        color: color,
+        transparent: true,
+        opacity: 0.8
+      });
+      const mesh = new THREE.Mesh(geometry, material);
+      mesh.position.set(0, 0, 0);
+      mesh.velocity = new THREE.Vector3(
+        (Math.random() - 0.5) * 10,
+        (Math.random() - 0.5) * 10,
+        (Math.random() - 0.5) * 10
+      );
+      scene.add(mesh);
+      
+      // Auto-remove after animation
+      setTimeout(() => scene.remove(mesh), 3000);
+    }
+  }
+});
+</script>
+</body>
+</html>

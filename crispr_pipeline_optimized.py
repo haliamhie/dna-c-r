@@ -308,7 +308,67 @@ class OptimizedCRISPRPipeline:
         if 'quality_control' in self.results:
             self.visualizer.plot_quality_metrics(self.results['quality_control'])
         
-        self.visualizer.generate_html_report(self.results)
+        html_path = self.visualizer.generate_html_report(self.results)
+        
+        # Auto-open visualization
+        self._open_visualization(html_path)
+    
+    def _open_visualization(self, html_path: Path):
+        """Automatically open visualization in browser"""
+        import webbrowser
+        import platform
+        import subprocess
+        
+        if html_path and html_path.exists():
+            url = f"file://{html_path.absolute()}"
+            
+            # Try different methods to open
+            try:
+                # Method 1: webbrowser (most portable)
+                webbrowser.open(url)
+                logger.info(f"Opening visualization: {url}")
+            except:
+                # Method 2: system-specific commands
+                system = platform.system()
+                try:
+                    if system == "Darwin":  # macOS
+                        subprocess.run(["open", str(html_path)])
+                    elif system == "Linux":
+                        # Try common Linux browsers
+                        for browser in ["xdg-open", "firefox", "chromium", "google-chrome"]:
+                            try:
+                                subprocess.run([browser, str(html_path)], check=False)
+                                break
+                            except FileNotFoundError:
+                                continue
+                    elif system == "Windows":
+                        subprocess.run(["start", "", str(html_path)], shell=True)
+                except:
+                    pass
+            
+            # Also display the image files directly if matplotlib available
+            try:
+                import matplotlib.pyplot as plt
+                import matplotlib.image as mpimg
+                
+                # Find and display PNG files
+                png_files = list(self.visualizer.output_dir.glob("*.png"))
+                if png_files:
+                    fig, axes = plt.subplots(1, len(png_files), figsize=(15, 6))
+                    if len(png_files) == 1:
+                        axes = [axes]
+                    
+                    for ax, png_file in zip(axes, png_files[:3]):  # Max 3 images
+                        img = mpimg.imread(str(png_file))
+                        ax.imshow(img)
+                        ax.axis('off')
+                        ax.set_title(png_file.stem.replace('_', ' ').title())
+                    
+                    plt.tight_layout()
+                    plt.show(block=False)  # Non-blocking show
+                    logger.info("Displaying visualization plots")
+            except:
+                pass
     
     def _generate_reports(self):
         """Generate reports"""

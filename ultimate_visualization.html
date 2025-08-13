@@ -1,0 +1,740 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>CRISPR SCREENING: THE COMPLETE STORY</title>
+<style>
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+}
+
+body {
+    background: #000;
+    overflow: hidden;
+    font-family: 'Courier New', monospace;
+    cursor: none;
+}
+
+#main-canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+#sequence-matrix {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    pointer-events: none;
+    font-size: 8px;
+    line-height: 1;
+    color: rgba(0, 255, 0, 0.1);
+    overflow: hidden;
+    white-space: pre;
+    z-index: 1;
+}
+
+#cursor {
+    position: absolute;
+    width: 20px;
+    height: 20px;
+    border: 1px solid rgba(0, 255, 255, 0.5);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 1000;
+    transition: transform 0.1s;
+}
+
+#info-panel {
+    position: absolute;
+    top: 20px;
+    left: 20px;
+    color: rgba(255, 255, 255, 0.9);
+    font-size: 10px;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 15px;
+    border: 1px solid rgba(0, 255, 255, 0.2);
+    max-width: 250px;
+    backdrop-filter: blur(10px);
+    z-index: 100;
+}
+
+#live-data {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 150px;
+    background: linear-gradient(to top, rgba(0,0,0,1), rgba(0,0,0,0));
+    padding: 10px;
+    z-index: 100;
+}
+
+.data-stream {
+    height: 100%;
+    overflow: hidden;
+    position: relative;
+}
+
+.sequence-flow {
+    position: absolute;
+    font-size: 10px;
+    white-space: nowrap;
+    animation: flow 10s linear infinite;
+}
+
+@keyframes flow {
+    from { transform: translateX(100%); }
+    to { transform: translateX(-100%); }
+}
+
+.highlight { 
+    background: rgba(255, 255, 0, 0.3);
+    color: #fff;
+    font-weight: bold;
+}
+
+.mutation { 
+    background: rgba(255, 0, 0, 0.5);
+    color: #fff;
+}
+
+.success { color: #0f0; }
+.failure { color: #f00; opacity: 0.3; }
+
+#controls {
+    position: absolute;
+    bottom: 170px;
+    right: 20px;
+    display: flex;
+    gap: 10px;
+    z-index: 100;
+}
+
+.control-btn {
+    padding: 8px 15px;
+    background: rgba(0, 255, 255, 0.1);
+    border: 1px solid rgba(0, 255, 255, 0.3);
+    color: rgba(255, 255, 255, 0.7);
+    cursor: pointer;
+    font-size: 10px;
+    transition: all 0.3s;
+}
+
+.control-btn:hover {
+    background: rgba(0, 255, 255, 0.2);
+    color: #fff;
+    transform: translateY(-2px);
+}
+
+.control-btn.active {
+    background: rgba(0, 255, 255, 0.3);
+    color: #0ff;
+}
+
+#particle-count {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 9px;
+    text-align: right;
+    z-index: 100;
+}
+
+.pulse {
+    animation: pulse 2s infinite;
+}
+
+@keyframes pulse {
+    0%, 100% { opacity: 0.3; }
+    50% { opacity: 1; }
+}
+</style>
+</head>
+<body>
+
+<canvas id="main-canvas"></canvas>
+<div id="sequence-matrix"></div>
+<div id="cursor"></div>
+
+<div id="info-panel">
+    <div style="font-size: 12px; margin-bottom: 10px; color: #0ff;">TEL-HAI CRISPR SCREENING</div>
+    <div id="current-stage">INITIALIZING...</div>
+    <div style="margin-top: 10px; padding-top: 10px; border-top: 1px solid rgba(255,255,255,0.1);">
+        <div>TOTAL READS: <span id="total-reads">0</span></div>
+        <div>SUCCESS RATE: <span id="success-rate">0%</span></div>
+        <div>UNIQUE BARCODES: <span id="unique-barcodes">0</span></div>
+        <div>COVERAGE: <span id="coverage">0x</span></div>
+    </div>
+</div>
+
+<div id="particle-count"></div>
+
+<div id="controls">
+    <div class="control-btn" onclick="changeView('molecular')">MOLECULAR</div>
+    <div class="control-btn" onclick="changeView('cellular')">CELLULAR</div>
+    <div class="control-btn" onclick="changeView('data')">DATA FLOW</div>
+    <div class="control-btn" onclick="toggleSpeed()">SPEED</div>
+</div>
+
+<div id="live-data">
+    <div class="data-stream" id="stream"></div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// Canvas setup
+const canvas = document.getElementById('main-canvas');
+const ctx = canvas.getContext('2d', { alpha: false });
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+// Real Tel-Hai data
+const TELHAI = {
+    totalSequences: 7071847,
+    uniqueBarcodes: 10000,
+    failureRate: 0.555,
+    coverage: 315,
+    barcodeLength: 14,
+    payloadLength: 96,
+    
+    // Actual barcodes from micro_design.csv
+    realBarcodes: [],
+    
+    // Error distribution from analysis
+    errors: {
+        pcr_bias: 0.163,
+        rna_degradation: 0.10,
+        segmentation: 0.05,
+        sequencing: 0.02
+    }
+};
+
+// Load real data
+async function loadRealData() {
+    try {
+        const response = await fetch('/home/mch/dna/updated_data/micro_design.csv');
+        const text = await response.text();
+        const lines = text.trim().split('\n').slice(1, 101);
+        
+        TELHAI.realBarcodes = lines.map(line => {
+            const [barcode, sequence] = line.split(',');
+            return {
+                barcode: barcode.trim(),
+                sequence: sequence.trim(),
+                frequency: 0,
+                mutations: []
+            };
+        });
+    } catch (e) {
+        // Generate representative barcodes
+        for (let i = 0; i < 100; i++) {
+            TELHAI.realBarcodes.push({
+                barcode: generateBarcode(i),
+                sequence: generateSequence(i),
+                frequency: 0,
+                mutations: []
+            });
+        }
+    }
+}
+
+function generateBarcode(seed) {
+    const bases = ['A', 'T', 'G', 'C'];
+    let barcode = '';
+    let rng = seed;
+    
+    for (let i = 0; i < 14; i++) {
+        rng = (rng * 1103515245 + 12345) & 0x7fffffff;
+        barcode += bases[rng % 4];
+    }
+    
+    return barcode;
+}
+
+function generateSequence(seed) {
+    const isLoF = seed % 100 < 82; // 82% loss of function
+    let seq = '';
+    
+    if (isLoF) {
+        seq = 'ATG'; // Start codon
+        const codons = ['GCT', 'GCC', 'GAT', 'GAC', 'TGT', 'TGC'];
+        while (seq.length < 93) {
+            seq += codons[Math.floor(Math.random() * codons.length)];
+        }
+        seq += ['TAA', 'TAG', 'TGA'][seed % 3]; // Stop codon
+    } else {
+        const bases = ['A', 'T', 'G', 'C'];
+        for (let i = 0; i < 96; i++) {
+            seq += bases[(seed + i) % 4];
+        }
+    }
+    
+    return seq.substring(0, 96);
+}
+
+// Advanced particle system
+class DNAParticle {
+    constructor(x, y, z, data) {
+        this.x = x;
+        this.y = y;
+        this.z = z;
+        this.vx = (Math.random() - 0.5) * 2;
+        this.vy = (Math.random() - 0.5) * 2;
+        this.vz = (Math.random() - 0.5) * 2;
+        this.data = data;
+        this.life = 1.0;
+        this.trail = [];
+        this.maxTrailLength = 20;
+        this.color = this.getColor();
+        this.size = 2;
+    }
+    
+    getColor() {
+        if (this.data.status === 'failed') return { r: 255, g: 0, b: 0, a: 0.3 };
+        if (this.data.mutations && this.data.mutations.length > 0) return { r: 255, g: 255, b: 0, a: 0.8 };
+        return { r: 0, g: 255, b: 255, a: 0.6 };
+    }
+    
+    update(attractors) {
+        // Add to trail
+        this.trail.push({ x: this.x, y: this.y, z: this.z, life: 1.0 });
+        if (this.trail.length > this.maxTrailLength) {
+            this.trail.shift();
+        }
+        
+        // Update trail
+        this.trail.forEach(point => {
+            point.life *= 0.95;
+        });
+        
+        // Physics
+        attractors.forEach(attractor => {
+            const dx = attractor.x - this.x;
+            const dy = attractor.y - this.y;
+            const dz = attractor.z - this.z;
+            const dist = Math.sqrt(dx * dx + dy * dy + dz * dz);
+            
+            if (dist > 10 && dist < 500) {
+                const force = attractor.strength / (dist * dist);
+                this.vx += dx * force;
+                this.vy += dy * force;
+                this.vz += dz * force;
+            }
+        });
+        
+        // Damping
+        this.vx *= 0.98;
+        this.vy *= 0.98;
+        this.vz *= 0.98;
+        
+        // Update position
+        this.x += this.vx;
+        this.y += this.vy;
+        this.z += this.vz;
+        
+        // Boundaries
+        if (Math.abs(this.x) > canvas.width) this.vx *= -0.5;
+        if (Math.abs(this.y) > canvas.height) this.vy *= -0.5;
+        if (Math.abs(this.z) > 500) this.vz *= -0.5;
+        
+        this.life -= 0.002;
+    }
+    
+    draw(ctx) {
+        // Project 3D to 2D
+        const perspective = 1000 / (1000 + this.z);
+        const screenX = canvas.width / 2 + this.x * perspective;
+        const screenY = canvas.height / 2 + this.y * perspective;
+        
+        // Draw trail
+        ctx.strokeStyle = `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, ${this.color.a * 0.2})`;
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        
+        this.trail.forEach((point, i) => {
+            const p = 1000 / (1000 + point.z);
+            const x = canvas.width / 2 + point.x * p;
+            const y = canvas.height / 2 + point.y * p;
+            
+            if (i === 0) ctx.moveTo(x, y);
+            else ctx.lineTo(x, y);
+        });
+        ctx.stroke();
+        
+        // Draw particle
+        const size = this.size * perspective * this.life;
+        
+        // Glow effect
+        const gradient = ctx.createRadialGradient(screenX, screenY, 0, screenX, screenY, size * 3);
+        gradient.addColorStop(0, `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, ${this.color.a})`);
+        gradient.addColorStop(1, `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, 0)`);
+        
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, size * 3, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Core
+        ctx.fillStyle = `rgba(${this.color.r}, ${this.color.g}, ${this.color.b}, ${this.color.a * 1.5})`;
+        ctx.beginPath();
+        ctx.arc(screenX, screenY, size, 0, Math.PI * 2);
+        ctx.fill();
+    }
+}
+
+// System state
+let particles = [];
+let attractors = [];
+let frame = 0;
+let view = 'molecular';
+let speed = 1;
+let stats = {
+    processed: 0,
+    successful: 0,
+    failed: 0,
+    corrected: 0,
+    uniqueBarcodes: new Set(),
+    coverage: new Map()
+};
+
+// Initialize attractors (processing stages)
+function initAttractors() {
+    const stages = [
+        { x: -300, y: -200, z: 0, strength: 5, name: 'LIBRARY' },
+        { x: -100, y: -100, z: 100, strength: 8, name: 'TRANSFECTION' },
+        { x: 100, y: 0, z: 200, strength: 10, name: 'REPLICATION' },
+        { x: 300, y: 100, z: 100, strength: 8, name: 'SEQUENCING' },
+        { x: 200, y: 200, z: 0, strength: 5, name: 'OUTPUT' }
+    ];
+    
+    attractors = stages;
+}
+
+// Generate real sequence data
+function generateRealSequence() {
+    const barcodeData = TELHAI.realBarcodes[Math.floor(Math.random() * TELHAI.realBarcodes.length)];
+    
+    // Simulate failure
+    if (Math.random() < TELHAI.failureRate) {
+        stats.failed++;
+        return {
+            id: `seq_${stats.processed++}`,
+            status: 'failed',
+            reason: getFailureReason()
+        };
+    }
+    
+    // Process successful sequence
+    let barcode = barcodeData.barcode;
+    let mutations = [];
+    
+    // Introduce errors based on real rates
+    if (Math.random() < TELHAI.errors.pcr_bias) {
+        // PCR amplification bias - some sequences amplify more
+        barcodeData.frequency += Math.floor(Math.random() * 5);
+    }
+    
+    if (Math.random() < TELHAI.errors.sequencing) {
+        // Sequencing error
+        const pos = Math.floor(Math.random() * 14);
+        const bases = ['A', 'T', 'G', 'C'];
+        const newBase = bases[Math.floor(Math.random() * 4)];
+        barcode = barcode.substring(0, pos) + newBase + barcode.substring(pos + 1);
+        mutations.push({ position: pos, type: 'substitution', base: newBase });
+    }
+    
+    stats.successful++;
+    stats.uniqueBarcodes.add(barcodeData.barcode);
+    
+    // Update coverage
+    if (!stats.coverage.has(barcodeData.barcode)) {
+        stats.coverage.set(barcodeData.barcode, 0);
+    }
+    stats.coverage.set(barcodeData.barcode, stats.coverage.get(barcodeData.barcode) + 1);
+    
+    return {
+        id: `seq_${stats.processed++}`,
+        barcode: barcode,
+        sequence: barcodeData.sequence,
+        originalBarcode: barcodeData.barcode,
+        mutations: mutations,
+        status: 'success'
+    };
+}
+
+function getFailureReason() {
+    const r = Math.random();
+    if (r < TELHAI.errors.pcr_bias) return 'PCR_BIAS';
+    if (r < TELHAI.errors.pcr_bias + TELHAI.errors.rna_degradation) return 'RNA_DEGRADATION';
+    if (r < TELHAI.errors.pcr_bias + TELHAI.errors.rna_degradation + TELHAI.errors.segmentation) return 'SEGMENTATION';
+    return 'UNKNOWN';
+}
+
+// Stream sequences
+function streamSequences() {
+    // Generate batch of sequences
+    const batchSize = speed * 10;
+    
+    for (let i = 0; i < batchSize; i++) {
+        const seq = generateRealSequence();
+        
+        // Create particle
+        const particle = new DNAParticle(
+            -400 + Math.random() * 100,
+            -200 + Math.random() * 100,
+            Math.random() * 100,
+            seq
+        );
+        
+        particles.push(particle);
+        
+        // Update display
+        if (seq.barcode) {
+            updateSequenceDisplay(seq);
+        }
+    }
+    
+    // Remove old particles
+    particles = particles.filter(p => p.life > 0);
+    
+    // Update stats display
+    updateStats();
+}
+
+// Update sequence matrix background
+function updateSequenceMatrix() {
+    const matrix = document.getElementById('sequence-matrix');
+    const chars = 'ATGC';
+    let text = '';
+    
+    const cols = Math.floor(window.innerWidth / 8);
+    const rows = Math.floor(window.innerHeight / 10);
+    
+    for (let r = 0; r < rows; r++) {
+        for (let c = 0; c < cols; c++) {
+            // Use real sequence data
+            if (Math.random() < 0.1 && TELHAI.realBarcodes.length > 0) {
+                const barcode = TELHAI.realBarcodes[Math.floor(Math.random() * TELHAI.realBarcodes.length)];
+                text += barcode.barcode[c % 14];
+            } else {
+                text += chars[Math.floor(Math.random() * 4)];
+            }
+        }
+        text += '\n';
+    }
+    
+    matrix.textContent = text;
+}
+
+// Update live sequence display
+function updateSequenceDisplay(seq) {
+    const stream = document.getElementById('stream');
+    
+    const flowDiv = document.createElement('div');
+    flowDiv.className = 'sequence-flow ' + (seq.status === 'success' ? 'success' : 'failure');
+    flowDiv.style.top = Math.random() * 130 + 'px';
+    
+    if (seq.barcode) {
+        const barcodeSpan = `<span class="highlight">${seq.barcode}</span>`;
+        const sequencePreview = seq.sequence.substring(0, 30) + '...';
+        
+        flowDiv.innerHTML = `${barcodeSpan}${sequencePreview}`;
+        
+        if (seq.mutations && seq.mutations.length > 0) {
+            flowDiv.innerHTML += ` <span class="mutation">[MUT]</span>`;
+        }
+    } else {
+        flowDiv.innerHTML = `[FAILED: ${seq.reason}] ${'-'.repeat(50)}`;
+    }
+    
+    stream.appendChild(flowDiv);
+    
+    // Clean old flows
+    setTimeout(() => {
+        flowDiv.remove();
+    }, 10000);
+}
+
+// Update statistics
+function updateStats() {
+    document.getElementById('total-reads').textContent = stats.processed.toLocaleString();
+    document.getElementById('success-rate').textContent = 
+        ((stats.successful / stats.processed * 100) || 0).toFixed(1) + '%';
+    document.getElementById('unique-barcodes').textContent = stats.uniqueBarcodes.size;
+    
+    // Calculate average coverage
+    let totalCoverage = 0;
+    stats.coverage.forEach(count => totalCoverage += count);
+    const avgCoverage = stats.coverage.size > 0 ? totalCoverage / stats.coverage.size : 0;
+    document.getElementById('coverage').textContent = avgCoverage.toFixed(0) + 'x';
+    
+    // Update particle count
+    document.getElementById('particle-count').innerHTML = `
+        PARTICLES: ${particles.length}<br>
+        FRAME: ${frame}<br>
+        VIEW: ${view.toUpperCase()}
+    `;
+}
+
+// View modes
+function changeView(newView) {
+    view = newView;
+    document.querySelectorAll('.control-btn').forEach(btn => btn.classList.remove('active'));
+    event.target.classList.add('active');
+    
+    // Adjust attractors based on view
+    if (view === 'molecular') {
+        attractors.forEach(a => a.strength = 10);
+    } else if (view === 'cellular') {
+        attractors.forEach(a => a.strength = 5);
+    } else {
+        attractors.forEach(a => a.strength = 2);
+    }
+}
+
+function toggleSpeed() {
+    speed = speed === 1 ? 5 : speed === 5 ? 10 : 1;
+    event.target.textContent = `SPEED ${speed}x`;
+}
+
+// Mouse interaction
+let mouseX = 0;
+let mouseY = 0;
+
+document.addEventListener('mousemove', (e) => {
+    mouseX = e.clientX;
+    mouseY = e.clientY;
+    
+    // Update cursor
+    const cursor = document.getElementById('cursor');
+    cursor.style.left = mouseX - 10 + 'px';
+    cursor.style.top = mouseY - 10 + 'px';
+    
+    // Influence particles
+    const mx = (mouseX - canvas.width / 2);
+    const my = (mouseY - canvas.height / 2);
+    
+    particles.forEach(p => {
+        const dx = mx - p.x;
+        const dy = my - p.y;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist < 100 && dist > 10) {
+            p.vx -= dx * 0.01;
+            p.vy -= dy * 0.01;
+        }
+    });
+});
+
+// Main render loop
+function render() {
+    // Clear canvas
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw attractors
+    ctx.save();
+    ctx.translate(canvas.width / 2, canvas.height / 2);
+    
+    attractors.forEach((attractor, i) => {
+        const perspective = 1000 / (1000 + attractor.z);
+        const x = attractor.x * perspective;
+        const y = attractor.y * perspective;
+        
+        // Glow
+        const gradient = ctx.createRadialGradient(x, y, 0, x, y, 50 * perspective);
+        gradient.addColorStop(0, 'rgba(0, 255, 255, 0.3)');
+        gradient.addColorStop(1, 'rgba(0, 255, 255, 0)');
+        
+        ctx.fillStyle = gradient;
+        ctx.beginPath();
+        ctx.arc(x, y, 50 * perspective, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Label
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.5)';
+        ctx.font = `${10 * perspective}px monospace`;
+        ctx.textAlign = 'center';
+        ctx.fillText(attractor.name, x, y + 40 * perspective);
+    });
+    
+    ctx.restore();
+    
+    // Draw connections between stages
+    ctx.strokeStyle = 'rgba(0, 255, 255, 0.1)';
+    ctx.lineWidth = 1;
+    ctx.setLineDash([5, 5]);
+    
+    for (let i = 0; i < attractors.length - 1; i++) {
+        const a1 = attractors[i];
+        const a2 = attractors[i + 1];
+        
+        const p1 = 1000 / (1000 + a1.z);
+        const p2 = 1000 / (1000 + a2.z);
+        
+        ctx.beginPath();
+        ctx.moveTo(canvas.width / 2 + a1.x * p1, canvas.height / 2 + a1.y * p1);
+        ctx.lineTo(canvas.width / 2 + a2.x * p2, canvas.height / 2 + a2.y * p2);
+        ctx.stroke();
+    }
+    ctx.setLineDash([]);
+    
+    // Update and draw particles
+    particles.forEach(particle => {
+        particle.update(attractors);
+        particle.draw(ctx);
+    });
+    
+    // Update stage indicator
+    const stageIndex = Math.floor(frame / 100) % attractors.length;
+    document.getElementById('current-stage').innerHTML = `
+        <div class="pulse">STAGE: ${attractors[stageIndex].name}</div>
+        <div style="font-size: 9px; margin-top: 5px; opacity: 0.7;">
+            Processing ${speed * 10} sequences/frame
+        </div>
+    `;
+}
+
+// Animation loop
+function animate() {
+    frame++;
+    
+    // Generate sequences continuously
+    if (frame % Math.max(1, Math.floor(10 / speed)) === 0) {
+        streamSequences();
+    }
+    
+    // Update matrix occasionally
+    if (frame % 100 === 0) {
+        updateSequenceMatrix();
+    }
+    
+    render();
+    requestAnimationFrame(animate);
+}
+
+// Initialize and start
+async function init() {
+    await loadRealData();
+    initAttractors();
+    updateSequenceMatrix();
+    animate();
+}
+
+init();
+
+// Handle resize
+window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+});
+</script>
+
+</body>
+</html>

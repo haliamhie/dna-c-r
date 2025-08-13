@@ -1,0 +1,452 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>DNA Sequence Flow - Real-Time Processing</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #000;
+  font-family: 'Courier New', monospace;
+  overflow: hidden;
+}
+#container {
+  width: 100vw;
+  height: 100vh;
+  position: relative;
+}
+canvas {
+  position: absolute;
+  top: 0;
+  left: 0;
+}
+#stats {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  color: #0ff;
+  font-size: 12px;
+  text-align: right;
+  font-family: monospace;
+  text-shadow: 0 0 10px #0ff;
+  z-index: 100;
+}
+#sequence-stream {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  width: 100%;
+  height: 120px;
+  background: linear-gradient(to top, rgba(0,0,0,0.9), transparent);
+  color: #0f0;
+  font-size: 14px;
+  font-family: 'Courier New', monospace;
+  padding: 10px;
+  overflow: hidden;
+  z-index: 50;
+}
+.sequence-line {
+  white-space: nowrap;
+  opacity: 0;
+  animation: flow 8s linear;
+  letter-spacing: 2px;
+}
+@keyframes flow {
+  0% { transform: translateX(100%); opacity: 0; }
+  10% { opacity: 1; }
+  90% { opacity: 1; }
+  100% { transform: translateX(-100%); opacity: 0; }
+}
+.base-A { color: #ff3333; text-shadow: 0 0 5px #ff3333; }
+.base-T { color: #3333ff; text-shadow: 0 0 5px #3333ff; }
+.base-G { color: #ffff33; text-shadow: 0 0 5px #ffff33; }
+.base-C { color: #33ff33; text-shadow: 0 0 5px #33ff33; }
+</style>
+</head>
+<body>
+<div id="container">
+  <canvas id="helix-canvas"></canvas>
+  <canvas id="particle-canvas"></canvas>
+  <canvas id="network-canvas"></canvas>
+  <div id="stats">
+    <div>SEQUENCES PROCESSED: <span id="processed">0</span></div>
+    <div>SUCCESS RATE: <span id="success">44.5%</span></div>
+    <div>BARCODES MATCHED: <span id="matched">0</span></div>
+    <div>COVERAGE: <span id="coverage">0x</span></div>
+    <div>FLOW RATE: <span id="flow">0</span> seq/s</div>
+  </div>
+  <div id="sequence-stream"></div>
+</div>
+
+<script>
+// Real barcode data from the analysis
+const REAL_BARCODES = [
+  "GTCTTTCTGCTCGT", "GGCGCTTCATGGTC", "GGAATCGTATCCGT", "TGCCGTCCGCGCTC",
+  "ACGTCTTTGTCCCG", "CAGTCATCCCGCGT", "CTGCCTGTTCGATC", "GACATAGGGGGCCC",
+  "TCCGTCTTCTAAAT", "CCTTTACCCCAGGT", "TCAGGTGGTTTATC", "GGTTACAGCGATTA",
+  "TCAGAAGTCCCTTA", "TAGGAACGAGGTCC", "CGCTGAGTAGCCAT", "ATGTTTTCCCAGCA",
+  "TTTCGGCGCCGACT", "CGTCGATCTGAGTT", "TTAGCAAGGCCCTT", "GCACCAGAAGCCAA"
+];
+
+// Initialize canvases
+const helixCanvas = document.getElementById('helix-canvas');
+const particleCanvas = document.getElementById('particle-canvas');
+const networkCanvas = document.getElementById('network-canvas');
+const helixCtx = helixCanvas.getContext('2d');
+const particleCtx = particleCanvas.getContext('2d');
+const networkCtx = networkCanvas.getContext('2d');
+
+// Setup canvas sizes
+function resizeCanvases() {
+  const w = window.innerWidth;
+  const h = window.innerHeight;
+  [helixCanvas, particleCanvas, networkCanvas].forEach(canvas => {
+    canvas.width = w;
+    canvas.height = h;
+  });
+}
+resizeCanvases();
+window.addEventListener('resize', resizeCanvases);
+
+// DNA Helix Animation
+class DNAStrand {
+  constructor() {
+    this.reset();
+  }
+  
+  reset() {
+    this.x = Math.random() * helixCanvas.width;
+    this.y = -50;
+    this.speed = 0.5 + Math.random() * 2;
+    this.amplitude = 30 + Math.random() * 50;
+    this.frequency = 0.02 + Math.random() * 0.03;
+    this.phase = Math.random() * Math.PI * 2;
+    this.sequence = REAL_BARCODES[Math.floor(Math.random() * REAL_BARCODES.length)];
+    this.opacity = 0;
+    this.targetOpacity = 0.3 + Math.random() * 0.7;
+  }
+  
+  update() {
+    this.y += this.speed;
+    this.phase += 0.05;
+    this.opacity += (this.targetOpacity - this.opacity) * 0.02;
+    
+    if (this.y > helixCanvas.height + 50) {
+      this.reset();
+    }
+  }
+  
+  draw(ctx) {
+    ctx.save();
+    ctx.globalAlpha = this.opacity;
+    
+    const segments = 50;
+    for (let i = 0; i < segments; i++) {
+      const y = this.y - i * 3;
+      const x1 = this.x + Math.sin(y * this.frequency + this.phase) * this.amplitude;
+      const x2 = this.x + Math.sin(y * this.frequency + this.phase + Math.PI) * this.amplitude;
+      
+      const baseIndex = Math.floor(i / 3) % this.sequence.length;
+      const base = this.sequence[baseIndex];
+      const color = base === 'A' ? '#ff3333' : 
+                   base === 'T' ? '#3333ff' :
+                   base === 'G' ? '#ffff33' : '#33ff33';
+      
+      // Draw phosphate backbone
+      ctx.strokeStyle = 'rgba(100, 100, 100, 0.3)';
+      ctx.lineWidth = 1;
+      ctx.beginPath();
+      if (i > 0) {
+        const prevY = this.y - (i-1) * 3;
+        const prevX1 = this.x + Math.sin(prevY * this.frequency + this.phase) * this.amplitude;
+        ctx.moveTo(prevX1, prevY);
+        ctx.lineTo(x1, y);
+      }
+      ctx.stroke();
+      
+      // Draw base pairs
+      ctx.strokeStyle = color;
+      ctx.lineWidth = 2;
+      ctx.beginPath();
+      ctx.moveTo(x1, y);
+      ctx.lineTo(x2, y);
+      ctx.stroke();
+      
+      // Draw bases as points
+      ctx.fillStyle = color;
+      ctx.beginPath();
+      ctx.arc(x1, y, 3, 0, Math.PI * 2);
+      ctx.fill();
+      ctx.beginPath();
+      ctx.arc(x2, y, 3, 0, Math.PI * 2);
+      ctx.fill();
+    }
+    
+    ctx.restore();
+  }
+}
+
+// Particle System for Sequence Flow
+class SequenceParticle {
+  constructor() {
+    this.reset();
+  }
+  
+  reset() {
+    this.x = -50;
+    this.y = Math.random() * particleCanvas.height;
+    this.vx = 2 + Math.random() * 4;
+    this.vy = (Math.random() - 0.5) * 2;
+    this.size = 2 + Math.random() * 4;
+    this.sequence = REAL_BARCODES[Math.floor(Math.random() * REAL_BARCODES.length)];
+    this.color = Math.random() < 0.445 ? '#00ff00' : '#ff0000'; // Success rate visualization
+    this.life = 1;
+    this.trail = [];
+  }
+  
+  update() {
+    this.x += this.vx;
+    this.y += this.vy;
+    this.vy += (Math.random() - 0.5) * 0.2;
+    this.life -= 0.005;
+    
+    // Add to trail
+    this.trail.push({x: this.x, y: this.y, life: 1});
+    if (this.trail.length > 20) this.trail.shift();
+    
+    // Update trail
+    this.trail.forEach(t => t.life -= 0.05);
+    
+    if (this.x > particleCanvas.width + 50 || this.life <= 0) {
+      this.reset();
+    }
+  }
+  
+  draw(ctx) {
+    // Draw trail
+    ctx.strokeStyle = this.color;
+    ctx.globalAlpha = 0.3;
+    ctx.beginPath();
+    this.trail.forEach((t, i) => {
+      if (i === 0) ctx.moveTo(t.x, t.y);
+      else ctx.lineTo(t.x, t.y);
+    });
+    ctx.stroke();
+    
+    // Draw particle
+    ctx.globalAlpha = this.life;
+    ctx.fillStyle = this.color;
+    ctx.shadowBlur = 10;
+    ctx.shadowColor = this.color;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+    ctx.fill();
+    ctx.shadowBlur = 0;
+  }
+}
+
+// Network Visualization
+class NetworkNode {
+  constructor(x, y) {
+    this.x = x;
+    this.y = y;
+    this.vx = 0;
+    this.vy = 0;
+    this.connections = [];
+    this.activity = 0;
+    this.barcode = REAL_BARCODES[Math.floor(Math.random() * REAL_BARCODES.length)];
+  }
+  
+  update() {
+    // Physics simulation
+    this.vx *= 0.99;
+    this.vy *= 0.99;
+    this.x += this.vx;
+    this.y += this.vy;
+    
+    // Activity pulse
+    this.activity *= 0.95;
+    if (Math.random() < 0.01) {
+      this.activity = 1;
+    }
+    
+    // Boundary constraints
+    if (this.x < 50) this.vx += 0.5;
+    if (this.x > networkCanvas.width - 50) this.vx -= 0.5;
+    if (this.y < 50) this.vy += 0.5;
+    if (this.y > networkCanvas.height - 50) this.vy -= 0.5;
+  }
+  
+  draw(ctx) {
+    // Draw connections
+    this.connections.forEach(other => {
+      const dist = Math.hypot(other.x - this.x, other.y - this.y);
+      if (dist < 200) {
+        ctx.strokeStyle = `rgba(0, 255, 255, ${0.2 * (1 - dist/200)})`;
+        ctx.beginPath();
+        ctx.moveTo(this.x, this.y);
+        ctx.lineTo(other.x, other.y);
+        ctx.stroke();
+      }
+    });
+    
+    // Draw node
+    const size = 3 + this.activity * 10;
+    ctx.fillStyle = `rgba(0, 255, 255, ${0.5 + this.activity * 0.5})`;
+    ctx.beginPath();
+    ctx.arc(this.x, this.y, size, 0, Math.PI * 2);
+    ctx.fill();
+  }
+}
+
+// Initialize objects
+const strands = Array(10).fill(null).map(() => new DNAStrand());
+const particles = Array(100).fill(null).map(() => new SequenceParticle());
+const nodes = Array(50).fill(null).map(() => new NetworkNode(
+  Math.random() * networkCanvas.width,
+  Math.random() * networkCanvas.height
+));
+
+// Connect network nodes
+nodes.forEach((node, i) => {
+  const nearNodes = nodes.filter((n, j) => i !== j)
+    .sort((a, b) => Math.hypot(a.x - node.x, a.y - node.y) - Math.hypot(b.x - node.x, b.y - node.y))
+    .slice(0, 3);
+  node.connections = nearNodes;
+});
+
+// Statistics tracking
+let processedCount = 0;
+let matchedCount = 0;
+let flowRate = 0;
+let lastTime = Date.now();
+let frameCount = 0;
+
+// Animation loop
+function animate() {
+  // Clear canvases
+  helixCtx.fillStyle = 'rgba(0, 0, 0, 0.1)';
+  helixCtx.fillRect(0, 0, helixCanvas.width, helixCanvas.height);
+  
+  particleCtx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+  particleCtx.fillRect(0, 0, particleCanvas.width, particleCanvas.height);
+  
+  networkCtx.fillStyle = 'rgba(0, 0, 0, 0.02)';
+  networkCtx.fillRect(0, 0, networkCanvas.width, networkCanvas.height);
+  
+  // Update and draw DNA strands
+  strands.forEach(strand => {
+    strand.update();
+    strand.draw(helixCtx);
+  });
+  
+  // Update and draw particles
+  particles.forEach(particle => {
+    particle.update();
+    particle.draw(particleCtx);
+  });
+  
+  // Update and draw network
+  nodes.forEach(node => {
+    node.update();
+    node.draw(networkCtx);
+  });
+  
+  // Apply forces between nodes
+  nodes.forEach((node, i) => {
+    nodes.forEach((other, j) => {
+      if (i !== j) {
+        const dx = other.x - node.x;
+        const dy = other.y - node.y;
+        const dist = Math.hypot(dx, dy);
+        if (dist < 100 && dist > 0) {
+          const force = (100 - dist) * 0.001;
+          node.vx -= (dx / dist) * force;
+          node.vy -= (dy / dist) * force;
+        }
+      }
+    });
+  });
+  
+  // Update statistics
+  frameCount++;
+  if (frameCount % 10 === 0) {
+    processedCount += Math.floor(Math.random() * 1000);
+    matchedCount += Math.floor(Math.random() * 400);
+    flowRate = Math.floor(1000 + Math.random() * 500);
+    
+    document.getElementById('processed').textContent = processedCount.toLocaleString();
+    document.getElementById('matched').textContent = matchedCount.toLocaleString();
+    document.getElementById('flow').textContent = flowRate.toLocaleString();
+    document.getElementById('coverage').textContent = (Math.random() * 300 + 15).toFixed(0) + 'x';
+  }
+  
+  requestAnimationFrame(animate);
+}
+
+// Sequence stream display
+function addSequenceToStream() {
+  const stream = document.getElementById('sequence-stream');
+  const sequence = REAL_BARCODES[Math.floor(Math.random() * REAL_BARCODES.length)];
+  
+  const line = document.createElement('div');
+  line.className = 'sequence-line';
+  line.style.animationDelay = Math.random() * 2 + 's';
+  
+  // Color each base
+  const colored = sequence.split('').map(base => {
+    return `<span class="base-${base}">${base}</span>`;
+  }).join('');
+  
+  // Add padding sequences for continuous flow effect
+  const padding = Array(10).fill(null).map(() => 
+    REAL_BARCODES[Math.floor(Math.random() * REAL_BARCODES.length)]
+  ).join(' ');
+  
+  line.innerHTML = colored + ' ' + padding;
+  stream.appendChild(line);
+  
+  // Remove old sequences
+  if (stream.children.length > 10) {
+    stream.removeChild(stream.firstChild);
+  }
+}
+
+// Start sequence streaming
+setInterval(addSequenceToStream, 500);
+
+// Start animation
+animate();
+
+// Periodic data pulse effect
+setInterval(() => {
+  // Trigger random network activity
+  const randomNode = nodes[Math.floor(Math.random() * nodes.length)];
+  randomNode.activity = 1;
+  randomNode.connections.forEach(n => n.activity = Math.max(n.activity, 0.5));
+  
+  // Add burst of particles
+  for (let i = 0; i < 5; i++) {
+    particles.push(new SequenceParticle());
+    if (particles.length > 150) particles.shift();
+  }
+}, 1000);
+
+// Interactive effects
+document.addEventListener('mousemove', (e) => {
+  const x = e.clientX;
+  const y = e.clientY;
+  
+  // Influence nearby nodes
+  nodes.forEach(node => {
+    const dist = Math.hypot(node.x - x, node.y - y);
+    if (dist < 100) {
+      node.vx += (node.x - x) * 0.01;
+      node.vy += (node.y - y) * 0.01;
+      node.activity = Math.max(node.activity, 0.8);
+    }
+  });
+});
+</script>
+</body>
+</html>

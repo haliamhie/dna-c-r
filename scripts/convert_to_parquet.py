@@ -59,8 +59,7 @@ def main():
     con = duckdb.connect(str(db_path))
     con.execute("INSTALL parquet; LOAD parquet;")
     con.execute(
-        "CREATE OR REPLACE VIEW clusters AS SELECT * FROM read_parquet(?)",
-        [str(parq_dir / '*.parquet')]
+        f"CREATE OR REPLACE VIEW clusters AS SELECT * FROM read_parquet('{str(parq_dir / '*.parquet')}')"
     )
     
     # Verify

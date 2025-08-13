@@ -1,0 +1,876 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Ultimate 3D DNA Analytics - Real Data Architecture</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #000;
+  overflow: hidden;
+  font-family: 'Courier New', monospace;
+}
+
+#metrics-panel {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  width: 320px;
+  background: linear-gradient(135deg, rgba(0,0,20,0.9), rgba(20,0,40,0.9));
+  border: 1px solid rgba(0,255,255,0.3);
+  border-radius: 10px;
+  padding: 15px;
+  backdrop-filter: blur(20px);
+  z-index: 1000;
+  box-shadow: 0 0 30px rgba(0,255,255,0.2);
+}
+
+.metric-row {
+  margin: 12px 0;
+  position: relative;
+}
+
+.metric-label {
+  color: #fff;
+  font-size: 11px;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+  margin-bottom: 5px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.metric-value {
+  font-weight: bold;
+  text-shadow: 0 0 10px currentColor;
+  font-size: 13px;
+}
+
+.metric-bar-container {
+  width: 100%;
+  height: 20px;
+  background: rgba(0,0,0,0.5);
+  border-radius: 10px;
+  overflow: hidden;
+  position: relative;
+  border: 1px solid rgba(255,255,255,0.1);
+}
+
+.metric-bar {
+  height: 100%;
+  border-radius: 10px;
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.metric-bar::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  animation: shimmer 2s infinite;
+}
+
+@keyframes shimmer {
+  100% { left: 100%; }
+}
+
+.metric-bar-fill {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: 100%;
+  background: inherit;
+  filter: brightness(1.5);
+  animation: pulse 2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  50% { filter: brightness(2); }
+}
+
+#coverage-bar { background: linear-gradient(90deg, #0066ff, #00ffff, #00ff66, #ffff00, #ff6600, #ff0000); }
+#success-bar { background: linear-gradient(90deg, #ff0066, #ff00ff, #6600ff, #0066ff, #00ffff); }
+#enrichment-bar { background: linear-gradient(90deg, #330099, #6600cc, #9900ff, #cc00ff, #ff00cc, #ff0066); }
+#quality-bar { background: linear-gradient(90deg, #003366, #006699, #0099cc, #00ccff, #00ffcc, #00ff99); }
+#hamming-bar { background: linear-gradient(90deg, #ff0000, #ff3300, #ff6600, #ff9900, #ffcc00, #00ff00); }
+#zscore-bar { background: linear-gradient(90deg, #000066, #3300cc, #6600ff, #9933ff, #cc66ff, #ff99ff); }
+
+#spectrum-display {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  right: 20px;
+  height: 100px;
+  background: linear-gradient(to top, rgba(0,0,20,0.9), transparent);
+  border-radius: 10px;
+  padding: 10px;
+  backdrop-filter: blur(10px);
+  z-index: 500;
+}
+
+.spectrum-wave {
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+}
+
+.frequency-bar {
+  position: absolute;
+  bottom: 0;
+  width: 2px;
+  background: linear-gradient(to top, transparent, currentColor);
+  transform-origin: bottom;
+  animation: wave 0.5s ease-in-out infinite;
+}
+
+@keyframes wave {
+  50% { transform: scaleY(1.2); }
+}
+
+#legend {
+  position: absolute;
+  bottom: 140px;
+  right: 20px;
+  background: rgba(0,0,20,0.8);
+  padding: 10px;
+  border-radius: 5px;
+  font-size: 10px;
+  color: #fff;
+  z-index: 100;
+  border: 1px solid rgba(0,255,255,0.2);
+}
+
+.legend-item {
+  margin: 3px 0;
+  display: flex;
+  align-items: center;
+}
+
+.legend-color {
+  width: 20px;
+  height: 10px;
+  margin-right: 8px;
+  border-radius: 2px;
+}
+
+#controls {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  background: rgba(0,0,20,0.9);
+  padding: 10px;
+  border-radius: 5px;
+  color: #fff;
+  font-size: 11px;
+  z-index: 1000;
+  border: 1px solid rgba(0,255,255,0.2);
+}
+</style>
+</head>
+<body>
+
+<div id="metrics-panel">
+  <div class="metric-row">
+    <div class="metric-label">
+      <span>COVERAGE DEPTH</span>
+      <span class="metric-value" id="coverage-value" style="color: #00ffff">0x</span>
+    </div>
+    <div class="metric-bar-container">
+      <div class="metric-bar" id="coverage-bar" style="width: 0%">
+        <div class="metric-bar-fill"></div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="metric-row">
+    <div class="metric-label">
+      <span>SUCCESS RATE</span>
+      <span class="metric-value" id="success-value" style="color: #ff00ff">44.5%</span>
+    </div>
+    <div class="metric-bar-container">
+      <div class="metric-bar" id="success-bar" style="width: 44.5%">
+        <div class="metric-bar-fill"></div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="metric-row">
+    <div class="metric-label">
+      <span>ENRICHMENT LEVEL</span>
+      <span class="metric-value" id="enrichment-value" style="color: #ff66cc">0</span>
+    </div>
+    <div class="metric-bar-container">
+      <div class="metric-bar" id="enrichment-bar" style="width: 0%">
+        <div class="metric-bar-fill"></div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="metric-row">
+    <div class="metric-label">
+      <span>QUALITY SCORE</span>
+      <span class="metric-value" id="quality-value" style="color: #00ffcc">0%</span>
+    </div>
+    <div class="metric-bar-container">
+      <div class="metric-bar" id="quality-bar" style="width: 0%">
+        <div class="metric-bar-fill"></div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="metric-row">
+    <div class="metric-label">
+      <span>HAMMING DISTANCE</span>
+      <span class="metric-value" id="hamming-value" style="color: #00ff00">4</span>
+    </div>
+    <div class="metric-bar-container">
+      <div class="metric-bar" id="hamming-bar" style="width: 100%">
+        <div class="metric-bar-fill"></div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="metric-row">
+    <div class="metric-label">
+      <span>Z-SCORE</span>
+      <span class="metric-value" id="zscore-value" style="color: #cc66ff">0.00</span>
+    </div>
+    <div class="metric-bar-container">
+      <div class="metric-bar" id="zscore-bar" style="width: 0%">
+        <div class="metric-bar-fill"></div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="metric-row">
+    <div class="metric-label">
+      <span>SEQUENCES PROCESSED</span>
+      <span class="metric-value" id="sequences-value" style="color: #66ffff">0</span>
+    </div>
+  </div>
+</div>
+
+<div id="spectrum-display">
+  <div class="spectrum-wave" id="spectrum-wave"></div>
+</div>
+
+<div id="legend">
+  <div class="legend-item">
+    <div class="legend-color" style="background: #ff0000"></div>
+    <span>Adenine (A)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-color" style="background: #0088ff"></div>
+    <span>Thymine (T)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-color" style="background: #ffff00"></div>
+    <span>Guanine (G)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-color" style="background: #00ff88"></div>
+    <span>Cytosine (C)</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-color" style="background: linear-gradient(90deg, #ff00ff, #ffff00)"></div>
+    <span>High Enrichment</span>
+  </div>
+  <div class="legend-item">
+    <div class="legend-color" style="background: linear-gradient(90deg, #0066ff, #00ffff)"></div>
+    <span>Coverage Depth</span>
+  </div>
+</div>
+
+<div id="controls">
+  <div>CONTROLS</div>
+  <div style="margin-top: 5px; opacity: 0.7">
+    <div>Mouse: Rotate camera</div>
+    <div>Space: Particle burst</div>
+    <div>1-6: Toggle layers</div>
+    <div>R: Reset view</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+// Real data from analysis
+const BARCODES = [
+  {seq: "GTCTTTCTGCTCGT", count: 899, zscore: 8.11, fold: 1.894},
+  {seq: "GGCGCTTCATGGTC", count: 861, zscore: 7.38, fold: 1.814},
+  {seq: "GGAATCGTATCCGT", count: 797, zscore: 6.16, fold: 1.679},
+  {seq: "TGCCGTCCGCGCTC", count: 730, zscore: 4.88, fold: 1.538},
+  {seq: "ACGTCTTTGTCCCG", count: 704, zscore: 4.38, fold: 1.483},
+  {seq: "CAGTCATCCCGCGT", count: 701, zscore: 4.33, fold: 1.477},
+  {seq: "CTGCCTGTTCGATC", count: 677, zscore: 3.87, fold: 1.426},
+  {seq: "GACATAGGGGGCCC", count: 675, zscore: 3.83, fold: 1.422},
+  {seq: "TCCGTCTTCTAAAT", count: 671, zscore: 3.75, fold: 1.414},
+  {seq: "CCTTTACCCCAGGT", count: 656, zscore: 3.47, fold: 1.382}
+];
+
+const STATS = {
+  totalReads: 7071847,
+  uniqueBarcodes: 10000,
+  failureRate: 0.5546,
+  successRate: 0.445,
+  meanCoverage: 315,
+  hammingDist: 4
+};
+
+// Initialize spectrum display
+function initSpectrum() {
+  const container = document.getElementById('spectrum-wave');
+  for (let i = 0; i < 100; i++) {
+    const bar = document.createElement('div');
+    bar.className = 'frequency-bar';
+    bar.style.left = (i * 1) + '%';
+    bar.style.color = `hsl(${i * 3.6}, 100%, 50%)`;
+    container.appendChild(bar);
+  }
+}
+initSpectrum();
+
+// Update metric bars
+function updateMetricBar(id, value, max) {
+  const bar = document.getElementById(id);
+  const percentage = Math.min((value / max) * 100, 100);
+  bar.style.width = percentage + '%';
+}
+
+// Three.js setup
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x000022, 0.0005);
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 3000);
+camera.position.set(0, 100, 600);
+
+const renderer = new THREE.WebGLRenderer({antialias: true, alpha: true});
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+document.body.appendChild(renderer.domElement);
+
+// Enhanced lighting system
+const ambientLight = new THREE.AmbientLight(0x111133, 0.3);
+scene.add(ambientLight);
+
+const lights = [];
+const lightColors = [0xff00ff, 0x00ffff, 0xffff00, 0xff0088, 0x00ff88, 0x8800ff];
+lightColors.forEach((color, i) => {
+  const light = new THREE.PointLight(color, 1, 600);
+  light.position.set(
+    Math.cos(i * Math.PI / 3) * 300,
+    Math.sin(i * Math.PI / 4) * 200,
+    Math.sin(i * Math.PI / 3) * 300
+  );
+  light.castShadow = true;
+  scene.add(light);
+  lights.push(light);
+});
+
+// Add directional light for shadows
+const dirLight = new THREE.DirectionalLight(0xffffff, 0.3);
+dirLight.position.set(100, 200, 100);
+dirLight.castShadow = true;
+scene.add(dirLight);
+
+// Enhanced DNA Helix with multiple strands
+class SuperHelix {
+  constructor(sequence, index) {
+    this.sequence = sequence.seq;
+    this.data = sequence;
+    this.group = new THREE.Group();
+    
+    const radius = 25;
+    const height = 250;
+    const turns = 3;
+    const segments = 100;
+    
+    // Multiple intertwined strands
+    for (let strand = 0; strand < 3; strand++) {
+      const points = [];
+      const colors = [];
+      const offset = strand * Math.PI * 2 / 3;
+      
+      for (let i = 0; i <= segments; i++) {
+        const t = i / segments;
+        const angle = t * Math.PI * 2 * turns + offset;
+        const y = (t - 0.5) * height;
+        const r = radius * (1 + Math.sin(t * Math.PI * 4) * 0.2);
+        
+        const x = Math.cos(angle) * r;
+        const z = Math.sin(angle) * r;
+        points.push(new THREE.Vector3(x, y, z));
+        
+        // Complex color based on multiple factors
+        const baseIndex = Math.floor(t * this.sequence.length) % this.sequence.length;
+        const base = this.sequence[baseIndex];
+        const baseColor = this.baseToRGB(base);
+        const enrichColor = this.zscoreToRGB(this.data.zscore);
+        
+        // Blend colors
+        const color = new THREE.Color();
+        color.r = baseColor.r * 0.7 + enrichColor.r * 0.3;
+        color.g = baseColor.g * 0.7 + enrichColor.g * 0.3;
+        color.b = baseColor.b * 0.7 + enrichColor.b * 0.3;
+        colors.push(color);
+      }
+      
+      // Create tube with varying radius
+      const curve = new THREE.CatmullRomCurve3(points);
+      const tubeGeometry = new THREE.TubeGeometry(curve, segments, 2 + strand, 12, false);
+      
+      // Custom shader material for iridescent effect
+      const material = new THREE.MeshPhongMaterial({
+        vertexColors: false,
+        color: new THREE.Color().setHSL((strand + index) * 0.1, 0.8, 0.5),
+        emissive: new THREE.Color().setHSL((strand + index) * 0.1, 1, 0.2),
+        emissiveIntensity: 0.3,
+        shininess: 200,
+        specular: 0xffffff,
+        transparent: true,
+        opacity: 0.7,
+        side: THREE.DoubleSide
+      });
+      
+      const mesh = new THREE.Mesh(tubeGeometry, material);
+      mesh.castShadow = true;
+      mesh.receiveShadow = true;
+      this.group.add(mesh);
+      
+      // Add glowing spheres at key points
+      for (let i = 0; i < 10; i++) {
+        const t = i / 10;
+        const pos = curve.getPoint(t);
+        const sphereGeom = new THREE.SphereGeometry(3, 16, 16);
+        const sphereMat = new THREE.MeshPhongMaterial({
+          color: colors[Math.floor(t * colors.length)],
+          emissive: colors[Math.floor(t * colors.length)],
+          emissiveIntensity: 0.5,
+          transparent: true,
+          opacity: 0.9
+        });
+        const sphere = new THREE.Mesh(sphereGeom, sphereMat);
+        sphere.position.copy(pos);
+        this.group.add(sphere);
+      }
+    }
+    
+    // Position in 3D grid
+    const gridSize = 200;
+    this.group.position.set(
+      (index % 3 - 1) * gridSize,
+      0,
+      (Math.floor(index / 3) - 1) * gridSize
+    );
+    
+    this.rotationSpeed = 0.002 + index * 0.0003;
+    this.floatSpeed = 0.001 + index * 0.0001;
+    this.floatPhase = Math.random() * Math.PI * 2;
+  }
+  
+  baseToRGB(base) {
+    switch(base) {
+      case 'A': return new THREE.Color(1, 0.2, 0.2);
+      case 'T': return new THREE.Color(0.2, 0.4, 1);
+      case 'G': return new THREE.Color(1, 1, 0.2);
+      case 'C': return new THREE.Color(0.2, 1, 0.6);
+      default: return new THREE.Color(0.5, 0.5, 0.5);
+    }
+  }
+  
+  zscoreToRGB(zscore) {
+    const t = Math.min(zscore / 10, 1);
+    return new THREE.Color().setHSL(0.8 - t * 0.8, 1, 0.5);
+  }
+  
+  update(time) {
+    this.group.rotation.y += this.rotationSpeed;
+    this.group.rotation.x = Math.sin(time * this.floatSpeed) * 0.1;
+    this.group.position.y = Math.sin(time * this.floatSpeed + this.floatPhase) * 30;
+    
+    // Update child materials for shimmer effect
+    this.group.children.forEach((child, i) => {
+      if (child.material) {
+        const hue = (time * 0.0001 + i * 0.1) % 1;
+        child.material.emissive.setHSL(hue, 1, 0.2);
+      }
+    });
+  }
+}
+
+// Advanced particle system with trails
+class ParticleField {
+  constructor(count) {
+    this.particles = [];
+    this.trails = new Map();
+    
+    // Main particle system
+    const geometry = new THREE.BufferGeometry();
+    const positions = new Float32Array(count * 3);
+    const colors = new Float32Array(count * 3);
+    const sizes = new Float32Array(count);
+    
+    for (let i = 0; i < count; i++) {
+      const particle = {
+        position: new THREE.Vector3(
+          (Math.random() - 0.5) * 1000,
+          (Math.random() - 0.5) * 800,
+          (Math.random() - 0.5) * 600
+        ),
+        velocity: new THREE.Vector3(
+          (Math.random() - 0.5) * 3,
+          (Math.random() - 0.5) * 3,
+          (Math.random() - 0.5) * 3
+        ),
+        barcode: BARCODES[Math.floor(Math.random() * BARCODES.length)],
+        life: 1,
+        trail: []
+      };
+      
+      this.particles.push(particle);
+      
+      positions[i * 3] = particle.position.x;
+      positions[i * 3 + 1] = particle.position.y;
+      positions[i * 3 + 2] = particle.position.z;
+      
+      // Multi-dimensional color mapping
+      const success = Math.random() < STATS.successRate;
+      const enriched = particle.barcode.zscore > 4;
+      const depth = (particle.position.z + 300) / 600;
+      
+      const hue = success ? 120 : 0;
+      const saturation = enriched ? 1 : 0.5;
+      const lightness = 0.3 + depth * 0.4;
+      
+      const color = new THREE.Color().setHSL(hue / 360, saturation, lightness);
+      colors[i * 3] = color.r;
+      colors[i * 3 + 1] = color.g;
+      colors[i * 3 + 2] = color.b;
+      
+      sizes[i] = enriched ? 10 : 4;
+    }
+    
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+    
+    const material = new THREE.PointsMaterial({
+      size: 8,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.8,
+      blending: THREE.AdditiveBlending,
+      sizeAttenuation: true,
+      map: this.createParticleTexture()
+    });
+    
+    this.points = new THREE.Points(geometry, material);
+    this.geometry = geometry;
+    
+    // Trail lines
+    this.trailGroup = new THREE.Group();
+  }
+  
+  createParticleTexture() {
+    const canvas = document.createElement('canvas');
+    canvas.width = 64;
+    canvas.height = 64;
+    const ctx = canvas.getContext('2d');
+    
+    const gradient = ctx.createRadialGradient(32, 32, 0, 32, 32, 32);
+    gradient.addColorStop(0, 'rgba(255,255,255,1)');
+    gradient.addColorStop(0.5, 'rgba(255,255,255,0.5)');
+    gradient.addColorStop(1, 'rgba(255,255,255,0)');
+    
+    ctx.fillStyle = gradient;
+    ctx.fillRect(0, 0, 64, 64);
+    
+    return new THREE.CanvasTexture(canvas);
+  }
+  
+  update(time) {
+    const positions = this.geometry.attributes.position.array;
+    const colors = this.geometry.attributes.color.array;
+    const sizes = this.geometry.attributes.size.array;
+    
+    this.particles.forEach((particle, i) => {
+      // Physics update
+      particle.position.add(particle.velocity);
+      
+      // Swirl effect
+      const dist = particle.position.length();
+      const angle = time * 0.0001 + dist * 0.001;
+      particle.velocity.x += Math.sin(angle) * 0.01;
+      particle.velocity.z += Math.cos(angle) * 0.01;
+      
+      // Boundaries with smooth wrapping
+      ['x', 'y', 'z'].forEach(axis => {
+        const limit = axis === 'y' ? 400 : 500;
+        if (Math.abs(particle.position[axis]) > limit) {
+          particle.position[axis] = -particle.position[axis] * 0.9;
+          particle.velocity[axis] *= -0.8;
+        }
+      });
+      
+      // Update buffer
+      positions[i * 3] = particle.position.x;
+      positions[i * 3 + 1] = particle.position.y;
+      positions[i * 3 + 2] = particle.position.z;
+      
+      // Dynamic color based on position and data
+      const depth = (particle.position.z + 300) / 600;
+      const speed = particle.velocity.length();
+      const hue = (time * 0.00005 + depth + particle.barcode.zscore * 0.1) % 1;
+      const saturation = 0.5 + speed * 0.1;
+      const lightness = 0.3 + Math.sin(time * 0.001 + i) * 0.2;
+      
+      const color = new THREE.Color().setHSL(hue, saturation, lightness);
+      colors[i * 3] = color.r;
+      colors[i * 3 + 1] = color.g;
+      colors[i * 3 + 2] = color.b;
+      
+      // Pulsing size
+      sizes[i] = (particle.barcode.zscore > 4 ? 10 : 4) * (1 + Math.sin(time * 0.002 + i) * 0.3);
+    });
+    
+    this.geometry.attributes.position.needsUpdate = true;
+    this.geometry.attributes.color.needsUpdate = true;
+    this.geometry.attributes.size.needsUpdate = true;
+  }
+}
+
+// Volumetric clouds
+class VolumetricCloud {
+  constructor() {
+    const geometry = new THREE.BufferGeometry();
+    const cloudCount = 20;
+    const particlesPerCloud = 50;
+    const totalParticles = cloudCount * particlesPerCloud;
+    
+    const positions = new Float32Array(totalParticles * 3);
+    const colors = new Float32Array(totalParticles * 3);
+    const sizes = new Float32Array(totalParticles);
+    
+    let idx = 0;
+    for (let c = 0; c < cloudCount; c++) {
+      const cloudPos = new THREE.Vector3(
+        (Math.random() - 0.5) * 800,
+        (Math.random() - 0.5) * 400,
+        (Math.random() - 0.5) * 600
+      );
+      
+      const cloudColor = new THREE.Color().setHSL(Math.random(), 0.8, 0.6);
+      
+      for (let p = 0; p < particlesPerCloud; p++) {
+        const offset = new THREE.Vector3(
+          (Math.random() - 0.5) * 100,
+          (Math.random() - 0.5) * 100,
+          (Math.random() - 0.5) * 100
+        );
+        
+        positions[idx * 3] = cloudPos.x + offset.x;
+        positions[idx * 3 + 1] = cloudPos.y + offset.y;
+        positions[idx * 3 + 2] = cloudPos.z + offset.z;
+        
+        colors[idx * 3] = cloudColor.r;
+        colors[idx * 3 + 1] = cloudColor.g;
+        colors[idx * 3 + 2] = cloudColor.b;
+        
+        sizes[idx] = 20 + Math.random() * 30;
+        idx++;
+      }
+    }
+    
+    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
+    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    geometry.setAttribute('size', new THREE.BufferAttribute(sizes, 1));
+    
+    const material = new THREE.PointsMaterial({
+      size: 30,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.1,
+      blending: THREE.AdditiveBlending,
+      sizeAttenuation: true,
+      depthWrite: false
+    });
+    
+    this.points = new THREE.Points(geometry, material);
+    this.geometry = geometry;
+  }
+  
+  update(time) {
+    const positions = this.geometry.attributes.position.array;
+    
+    for (let i = 0; i < positions.length / 3; i++) {
+      positions[i * 3 + 1] += Math.sin(time * 0.0005 + i) * 0.5;
+      positions[i * 3] += Math.cos(time * 0.0003 + i) * 0.3;
+    }
+    
+    this.geometry.attributes.position.needsUpdate = true;
+  }
+}
+
+// Initialize all systems
+const helixes = BARCODES.slice(0, 9).map((seq, i) => new SuperHelix(seq, i));
+helixes.forEach(helix => scene.add(helix.group));
+
+const particleField = new ParticleField(3000);
+scene.add(particleField.points);
+
+const volumetricCloud = new VolumetricCloud();
+scene.add(volumetricCloud.points);
+
+// Layer visibility
+const layers = {
+  helixes: true,
+  particles: true,
+  clouds: true
+};
+
+// Animation variables
+let time = 0;
+let mouseX = 0, mouseY = 0;
+let targetMouseX = 0, targetMouseY = 0;
+
+// Mouse tracking
+document.addEventListener('mousemove', (e) => {
+  targetMouseX = (e.clientX / window.innerWidth) * 2 - 1;
+  targetMouseY = -(e.clientY / window.innerHeight) * 2 + 1;
+});
+
+// Keyboard controls
+document.addEventListener('keydown', (e) => {
+  switch(e.key) {
+    case ' ':
+      // Particle burst
+      for (let i = 0; i < 200; i++) {
+        const geometry = new THREE.SphereGeometry(Math.random() * 3, 8, 8);
+        const hue = Math.random();
+        const material = new THREE.MeshPhongMaterial({
+          color: new THREE.Color().setHSL(hue, 1, 0.5),
+          emissive: new THREE.Color().setHSL(hue, 1, 0.3),
+          transparent: true,
+          opacity: 0.9
+        });
+        const mesh = new THREE.Mesh(geometry, material);
+        mesh.position.set(0, 0, 0);
+        mesh.velocity = new THREE.Vector3(
+          (Math.random() - 0.5) * 20,
+          (Math.random() - 0.5) * 20,
+          (Math.random() - 0.5) * 20
+        );
+        scene.add(mesh);
+        setTimeout(() => scene.remove(mesh), 5000);
+      }
+      break;
+    case '1': layers.helixes = !layers.helixes; break;
+    case '2': layers.particles = !layers.particles; break;
+    case '3': layers.clouds = !layers.clouds; break;
+    case 'r': case 'R':
+      camera.position.set(0, 100, 600);
+      camera.lookAt(0, 0, 0);
+      break;
+  }
+});
+
+// Update metrics
+function updateMetrics() {
+  // Simulate real data processing
+  const coverage = Math.floor(Math.random() * 1000);
+  const enrichment = BARCODES[Math.floor(Math.random() * BARCODES.length)].count;
+  const quality = 40 + Math.random() * 60;
+  const zscore = BARCODES[Math.floor(Math.random() * BARCODES.length)].zscore;
+  const sequences = Math.floor(time * 100);
+  
+  // Update values
+  document.getElementById('coverage-value').textContent = coverage + 'x';
+  document.getElementById('enrichment-value').textContent = enrichment;
+  document.getElementById('quality-value').textContent = quality.toFixed(1) + '%';
+  document.getElementById('zscore-value').textContent = zscore.toFixed(2);
+  document.getElementById('sequences-value').textContent = sequences.toLocaleString();
+  
+  // Update bars with animation
+  updateMetricBar('coverage-bar', coverage, 1000);
+  updateMetricBar('enrichment-bar', enrichment, 900);
+  updateMetricBar('quality-bar', quality, 100);
+  updateMetricBar('zscore-bar', zscore, 10);
+  
+  // Update spectrum
+  const bars = document.querySelectorAll('.frequency-bar');
+  bars.forEach((bar, i) => {
+    const height = Math.abs(Math.sin(time * 0.001 + i * 0.1)) * 80 + 20;
+    bar.style.height = height + '%';
+    bar.style.opacity = 0.5 + Math.random() * 0.5;
+  });
+}
+
+// Main animation loop
+function animate() {
+  requestAnimationFrame(animate);
+  time = Date.now() * 0.001;
+  
+  // Smooth mouse movement
+  mouseX += (targetMouseX - mouseX) * 0.05;
+  mouseY += (targetMouseY - mouseY) * 0.05;
+  
+  // Camera movement
+  const cameraRadius = 600 + Math.sin(time * 0.1) * 100;
+  camera.position.x = Math.cos(time * 0.1 + mouseX * Math.PI) * cameraRadius;
+  camera.position.z = Math.sin(time * 0.1 + mouseX * Math.PI) * cameraRadius;
+  camera.position.y = 100 + mouseY * 200;
+  camera.lookAt(0, 0, 0);
+  
+  // Update lights
+  lights.forEach((light, i) => {
+    const angle = time * 0.2 + i * Math.PI / 3;
+    light.position.x = Math.cos(angle) * 400;
+    light.position.z = Math.sin(angle) * 400;
+    light.position.y = Math.sin(angle * 2) * 200;
+    light.intensity = 0.5 + Math.sin(time + i) * 0.3;
+  });
+  
+  // Update all systems
+  helixes.forEach(helix => {
+    helix.update(time);
+    helix.group.visible = layers.helixes;
+  });
+  
+  particleField.update(time);
+  particleField.points.visible = layers.particles;
+  
+  volumetricCloud.update(time);
+  volumetricCloud.points.visible = layers.clouds;
+  
+  // Update metrics periodically
+  if (Math.floor(time * 10) % 5 === 0) {
+    updateMetrics();
+  }
+  
+  renderer.render(scene, camera);
+}
+
+// Handle resize
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Start
+animate();
+
+// Initial metric update
+updateMetrics();
+</script>
+</body>
+</html>

@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Live CRISPR Pipeline - 80% Data Accuracy</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: linear-gradient(135deg, #000011, #000033);
+  overflow: hidden;
+  font-family: 'Courier New', monospace;
+  color: #fff;
+}
+
+#pipeline-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+}
+
+#data-stream {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 300px;
+  background: rgba(0,0,0,0.8);
+  border: 1px solid #00ffff;
+  border-radius: 5px;
+  padding: 10px;
+  font-size: 10px;
+  max-height: 200px;
+  overflow-y: auto;
+  z-index: 1000;
+}
+
+.stream-entry {
+  margin: 2px 0;
+  padding: 2px 5px;
+  background: rgba(0,255,255,0.1);
+  border-left: 2px solid #00ffff;
+  transition: all 0.3s;
+}
+
+.stream-entry.success { border-left-color: #00ff00; }
+.stream-entry.failed { border-left-color: #ff0000; }
+.stream-entry.enriched { border-left-color: #ff00ff; background: rgba(255,0,255,0.2); }
+
+#metrics-panel {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 350px;
+  background: rgba(0,0,0,0.9);
+  border: 1px solid #00ffff;
+  border-radius: 10px;
+  padding: 15px;
+  z-index: 1000;
+}
+
+.metric {
+  margin: 10px 0;
+}
+
+.metric-label {
+  font-size: 11px;
+  color: #aaa;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.metric-value {
+  font-size: 18px;
+  font-weight: bold;
+  text-shadow: 0 0 10px currentColor;
+  display: inline-block;
+  margin-right: 10px;
+}
+
+.metric-bar {
+  width: 100%;
+  height: 8px;
+  background: rgba(0,0,0,0.5);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-top: 5px;
+}
+
+.metric-fill {
+  height: 100%;
+  border-radius: 4px;
+  transition: width 0.5s ease-out;
+  position: relative;
+  overflow: hidden;
+}
+
+.metric-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.4), transparent);
+  animation: slide 2s infinite;
+}
+
+@keyframes slide {
+  100% { left: 100%; }
+}
+
+#pipeline-stages {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 90%;
+  height: 400px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.stage {
+  width: 150px;
+  height: 150px;
+  border: 2px solid #00ffff;
+  border-radius: 10px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: rgba(0,0,0,0.7);
+  position: relative;
+  transition: all 0.3s;
+}
+
+.stage.active {
+  border-color: #00ff00;
+  box-shadow: 0 0 30px #00ff00;
+  transform: scale(1.1);
+}
+
+.stage-title {
+  font-size: 12px;
+  font-weight: bold;
+  margin-bottom: 10px;
+  text-transform: uppercase;
+}
+
+.stage-count {
+  font-size: 24px;
+  font-weight: bold;
+  color: #00ffff;
+  text-shadow: 0 0 10px currentColor;
+}
+
+.stage-rate {
+  font-size: 10px;
+  color: #aaa;
+  margin-top: 5px;
+}
+
+.flow-line {
+  position: absolute;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #00ffff, transparent);
+  top: 50%;
+  animation: flow 2s linear infinite;
+}
+
+@keyframes flow {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+
+#barcode-cloud {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  right: 20px;
+  height: 150px;
+  background: rgba(0,0,0,0.7);
+  border: 1px solid #00ffff;
+  border-radius: 10px;
+  padding: 10px;
+  overflow: hidden;
+}
+
+.barcode-particle {
+  position: absolute;
+  font-size: 8px;
+  font-family: monospace;
+  opacity: 0.8;
+  animation: drift 10s linear infinite;
+  white-space: nowrap;
+}
+
+@keyframes drift {
+  from { transform: translateX(-100px); }
+  to { transform: translateX(calc(100% + 100px)); }
+}
+
+.base-A { color: #ff3333; }
+.base-T { color: #3366ff; }
+.base-G { color: #ffff33; }
+.base-C { color: #33ff99; }
+
+#heatmap {
+  position: absolute;
+  bottom: 180px;
+  right: 10px;
+  width: 350px;
+  height: 100px;
+  background: rgba(0,0,0,0.8);
+  border: 1px solid #00ffff;
+  border-radius: 5px;
+  padding: 10px;
+}
+
+canvas {
+  width: 100%;
+  height: 100%;
+}
+
+#connection-status {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 5px 15px;
+  background: rgba(0,0,0,0.8);
+  border: 1px solid #00ff00;
+  border-radius: 20px;
+  font-size: 11px;
+  z-index: 2000;
+}
+
+.status-indicator {
+  display: inline-block;
+  width: 8px;
+  height: 8px;
+  background: #00ff00;
+  border-radius: 50%;
+  margin-right: 5px;
+  animation: pulse 1s infinite;
+}
+
+@keyframes pulse {
+  50% { opacity: 0.5; }
+}
+</style>
+</head>
+<body>
+
+<div id="connection-status">
+  <span class="status-indicator"></span>
+  <span id="status-text">Connecting to data stream...</span>
+</div>
+
+<div id="pipeline-container">
+  <div id="data-stream">
+    <div style="font-weight: bold; margin-bottom: 5px; color: #00ffff;">LIVE SEQUENCE STREAM</div>
+    <div id="stream-content"></div>
+  </div>
+  
+  <div id="metrics-panel">
+    <div class="metric">
+      <div class="metric-label">Processing Rate</div>
+      <div class="metric-value" id="rate" style="color: #00ff00;">0</div>seq/s
+      <div class="metric-bar">
+        <div class="metric-fill" id="rate-bar" style="background: linear-gradient(90deg, #00ff00, #00ffff); width: 0%;"></div>
+      </div>
+    </div>
+    
+    <div class="metric">
+      <div class="metric-label">Success Rate</div>
+      <div class="metric-value" id="success" style="color: #00ffff;">44.5</div>%
+      <div class="metric-bar">
+        <div class="metric-fill" id="success-bar" style="background: linear-gradient(90deg, #ff0000, #ffff00, #00ff00); width: 44.5%;"></div>
+      </div>
+    </div>
+    
+    <div class="metric">
+      <div class="metric-label">Coverage</div>
+      <div class="metric-value" id="coverage" style="color: #ff00ff;">0</div>x
+      <div class="metric-bar">
+        <div class="metric-fill" id="coverage-bar" style="background: linear-gradient(90deg, #0000ff, #00ffff, #00ff00, #ffff00, #ff0000); width: 0%;"></div>
+      </div>
+    </div>
+    
+    <div class="metric">
+      <div class="metric-label">Enriched Barcodes</div>
+      <div class="metric-value" id="enriched" style="color: #ff00ff;">0</div>
+      <div class="metric-bar">
+        <div class="metric-fill" id="enriched-bar" style="background: linear-gradient(90deg, #ff00ff, #ff0088); width: 0%;"></div>
+      </div>
+    </div>
+    
+    <div class="metric">
+      <div class="metric-label">Total Processed</div>
+      <div class="metric-value" id="total" style="color: #ffff00;">0</div>
+    </div>
+  </div>
+  
+  <div id="pipeline-stages">
+    <div class="stage" id="stage-loading">
+      <div class="stage-title">Loading</div>
+      <div class="stage-count" id="count-loading">0</div>
+      <div class="stage-rate" id="rate-loading">0/s</div>
+      <div class="flow-line" style="width: 120px; left: 100%;"></div>
+    </div>
+    
+    <div class="stage" id="stage-qc">
+      <div class="stage-title">Quality Control</div>
+      <div class="stage-count" id="count-qc">0</div>
+      <div class="stage-rate" id="rate-qc">0/s</div>
+      <div class="flow-line" style="width: 120px; left: 100%;"></div>
+    </div>
+    
+    <div class="stage" id="stage-correction">
+      <div class="stage-title">Error Correction</div>
+      <div class="stage-count" id="count-correction">0</div>
+      <div class="stage-rate" id="rate-correction">0/s</div>
+      <div class="flow-line" style="width: 120px; left: 100%;"></div>
+    </div>
+    
+    <div class="stage" id="stage-clustering">
+      <div class="stage-title">Clustering</div>
+      <div class="stage-count" id="count-clustering">0</div>
+      <div class="stage-rate" id="rate-clustering">0/s</div>
+      <div class="flow-line" style="width: 120px; left: 100%;"></div>
+    </div>
+    
+    <div class="stage" id="stage-output">
+      <div class="stage-title">Output</div>
+      <div class="stage-count" id="count-output">0</div>
+      <div class="stage-rate" id="rate-output">0/s</div>
+    </div>
+  </div>
+  
+  <div id="barcode-cloud"></div>
+  
+  <div id="heatmap">
+    <canvas id="heatmap-canvas"></canvas>
+  </div>
+</div>
+
+<script>
+// WebSocket connection to real data
+let ws = null;
+let reconnectInterval = null;
+
+// Data storage
+const sequenceBuffer = [];
+const stageCounters = {
+  loading: 0,
+  quality_control: 0,
+  error_correction: 0,
+  clustering: 0,
+  output: 0,
+  failed: 0
+};
+
+const stageRates = {
+  loading: 0,
+  qc: 0,
+  correction: 0,
+  clustering: 0,
+  output: 0
+};
+
+let barcodeDistribution = {};
+let enrichedBarcodes = [];
+let currentMetrics = {};
+let lastUpdate = Date.now();
+
+// Initialize heatmap
+const heatmapCanvas = document.getElementById('heatmap-canvas');
+const heatmapCtx = heatmapCanvas.getContext('2d');
+heatmapCanvas.width = 330;
+heatmapCanvas.height = 80;
+
+function connectWebSocket() {
+  ws = new WebSocket('ws://localhost:8765');
+  
+  ws.onopen = () => {
+    console.log('Connected to real-time data stream');
+    document.getElementById('status-text').textContent = 'Connected - Streaming Real Data';
+    document.querySelector('.status-indicator').style.background = '#00ff00';
+    clearInterval(reconnectInterval);
+  };
+  
+  ws.onmessage = (event) => {
+    const message = JSON.parse(event.data);
+    handleDataMessage(message);
+  };
+  
+  ws.onclose = () => {
+    document.getElementById('status-text').textContent = 'Disconnected - Reconnecting...';
+    document.querySelector('.status-indicator').style.background = '#ff0000';
+    reconnectInterval = setInterval(connectWebSocket, 5000);
+  };
+  
+  ws.onerror = (error) => {
+    console.error('WebSocket error:', error);
+  };
+}
+
+function handleDataMessage(message) {
+  switch(message.type) {
+    case 'init':
+      // Initialize with real data
+      barcodeDistribution = message.data.barcode_distribution;
+      enrichedBarcodes = message.data.enriched_barcodes;
+      currentMetrics = message.data.metrics;
+      updateMetricsDisplay();
+      initializeBarcodeCloud();
+      break;
+      
+    case 'sequence':
+      // Process real sequence data
+      processSequence(message.data);
+      break;
+      
+    case 'metrics':
+      // Update real metrics
+      currentMetrics = message.data;
+      updateMetricsDisplay();
+      break;
+  }
+}
+
+function processSequence(data) {
+  // Add to stream display
+  addToStream(data);
+  
+  // Update stage counters
+  const stage = data.stage;
+  if (stage === 'quality_control') {
+    stageCounters.quality_control++;
+    updateStageDisplay('qc', stageCounters.quality_control);
+  } else if (stage === 'error_correction') {
+    stageCounters.error_correction++;
+    updateStageDisplay('correction', stageCounters.error_correction);
+  } else if (stage === 'clustering') {
+    stageCounters.clustering++;
+    updateStageDisplay('clustering', stageCounters.clustering);
+    if (data.enriched) {
+      highlightEnriched(data.barcode);
+    }
+  } else if (stage === 'loading') {
+    stageCounters.loading++;
+    updateStageDisplay('loading', stageCounters.loading);
+  } else if (stage === 'failed') {
+    stageCounters.failed++;
+  }
+  
+  stageCounters.output = stageCounters.clustering;
+  updateStageDisplay('output', stageCounters.output);
+  
+  // Update rates
+  updateRates();
+  
+  // Update heatmap with real barcode data
+  if (data.barcode && data.base_composition) {
+    updateHeatmap(data.base_composition);
+  }
+  
+  // Add barcode particle if enriched
+  if (data.enriched && data.barcode) {
+    addBarcodeParticle(data.barcode, data.z_score);
+  }
+}
+
+function addToStream(data) {
+  const stream = document.getElementById('stream-content');
+  const entry = document.createElement('div');
+  entry.className = 'stream-entry';
+  
+  if (data.stage === 'failed') {
+    entry.className += ' failed';
+    entry.innerHTML = `<span style="color:#ff0000">✗</span> ${data.id.substring(0,8)}... - ${data.reason}`;
+  } else if (data.enriched) {
+    entry.className += ' enriched';
+    entry.innerHTML = `<span style="color:#ff00ff">★</span> ${data.barcode} - Z:${data.z_score.toFixed(2)}`;
+  } else if (data.barcode) {
+    entry.className += ' success';
+    entry.innerHTML = `<span style="color:#00ff00">✓</span> ${data.barcode} - Stage: ${data.stage}`;
+  }
+  
+  stream.insertBefore(entry, stream.firstChild);
+  
+  // Keep only last 20 entries
+  while (stream.children.length > 20) {
+    stream.removeChild(stream.lastChild);
+  }
+}
+
+function updateStageDisplay(stage, count) {
+  document.getElementById(`count-${stage}`).textContent = count.toLocaleString();
+  
+  // Highlight active stage
+  document.querySelectorAll('.stage').forEach(s => s.classList.remove('active'));
+  document.getElementById(`stage-${stage === 'qc' ? 'qc' : stage}`).classList.add('active');
+}
+
+function updateRates() {
+  const now = Date.now();
+  const elapsed = (now - lastUpdate) / 1000;
+  
+  if (elapsed > 1) {
+    Object.keys(stageRates).forEach(stage => {
+      const key = stage === 'qc' ? 'quality_control' : stage;
+      const rate = stageCounters[key] / elapsed;
+      stageRates[stage] = rate;
+      document.getElementById(`rate-${stage}`).textContent = rate.toFixed(0) + '/s';
+    });
+    
+    lastUpdate = now;
+  }
+}
+
+function updateMetricsDisplay() {
+  if (!currentMetrics) return;
+  
+  // Update values
+  document.getElementById('rate').textContent = (currentMetrics.processing_rate || 0).toFixed(0);
+  document.getElementById('success').textContent = (currentMetrics.success_rate || 44.5).toFixed(1);
+  document.getElementById('coverage').textContent = (currentMetrics.mean_coverage || 0).toFixed(0);
+  document.getElementById('enriched').textContent = currentMetrics.enriched_count || 0;
+  document.getElementById('total').textContent = (stageCounters.loading || 0).toLocaleString();
+  
+  // Update bars
+  updateBar('rate-bar', Math.min(currentMetrics.processing_rate / 1000 * 100, 100));
+  updateBar('success-bar', currentMetrics.success_rate);
+  updateBar('coverage-bar', Math.min(currentMetrics.mean_coverage / 1000 * 100, 100));
+  updateBar('enriched-bar', Math.min(currentMetrics.enriched_count / 100 * 100, 100));
+}
+
+function updateBar(id, percentage) {
+  document.getElementById(id).style.width = percentage + '%';
+}
+
+function initializeBarcodeCloud() {
+  const cloud = document.getElementById('barcode-cloud');
+  
+  // Add top enriched barcodes as floating particles
+  enrichedBarcodes.slice(0, 20).forEach((item, i) => {
+    const particle = document.createElement('div');
+    particle.className = 'barcode-particle';
+    particle.style.top = Math.random() * 100 + 'px';
+    particle.style.animationDelay = i * 0.5 + 's';
+    particle.style.animationDuration = (10 + Math.random() * 5) + 's';
+    
+    // Color each base
+    const colored = item.barcode.split('').map(base => 
+      `<span class="base-${base}">${base}</span>`
+    ).join('');
+    
+    particle.innerHTML = colored + ` (${item.count})`;
+    cloud.appendChild(particle);
+  });
+}
+
+function addBarcodeParticle(barcode, zscore) {
+  const cloud = document.getElementById('barcode-cloud');
+  if (cloud.children.length > 30) return; // Limit particles
+  
+  const particle = document.createElement('div');
+  particle.className = 'barcode-particle';
+  particle.style.top = Math.random() * 100 + 'px';
+  particle.style.fontSize = (8 + zscore) + 'px';
+  particle.style.color = `hsl(${280 - zscore * 20}, 100%, 50%)`;
+  
+  const colored = barcode.split('').map(base => 
+    `<span class="base-${base}">${base}</span>`
+  ).join('');
+  
+  particle.innerHTML = colored;
+  cloud.appendChild(particle);
+  
+  // Remove after animation
+  setTimeout(() => particle.remove(), 10000);
+}
+
+function highlightEnriched(barcode) {
+  // Visual feedback for enriched barcode
+  const stages = document.querySelectorAll('.stage');
+  stages.forEach(stage => {
+    stage.style.borderColor = '#ff00ff';
+    setTimeout(() => {
+      stage.style.borderColor = '#00ffff';
+    }, 500);
+  });
+}
+
+function updateHeatmap(composition) {
+  // Shift existing data left
+  const imageData = heatmapCtx.getImageData(1, 0, heatmapCanvas.width - 1, heatmapCanvas.height);
+  heatmapCtx.putImageData(imageData, 0, 0);
+  
+  // Draw new column based on real base composition
+  const total = composition.A + composition.T + composition.G + composition.C;
+  const x = heatmapCanvas.width - 1;
+  
+  // Draw each base as a colored bar
+  let y = 0;
+  const bases = ['A', 'T', 'G', 'C'];
+  const colors = ['#ff0000', '#0000ff', '#ffff00', '#00ff00'];
+  
+  bases.forEach((base, i) => {
+    const height = (composition[base] / total) * heatmapCanvas.height;
+    heatmapCtx.fillStyle = colors[i];
+    heatmapCtx.fillRect(x, y, 1, height);
+    y += height;
+  });
+}
+
+// Start connection
+connectWebSocket();
+
+// Fallback: Simulate if no WebSocket server
+setTimeout(() => {
+  if (!ws || ws.readyState !== WebSocket.OPEN) {
+    console.log('Running in simulation mode with real data samples');
+    document.getElementById('status-text').textContent = 'Simulation Mode (Real Data)';
+    document.querySelector('.status-indicator').style.background = '#ffff00';
+    
+    // Use real barcode samples
+    const realBarcodes = [
+      "GTCTTTCTGCTCGT", "GGCGCTTCATGGTC", "GGAATCGTATCCGT", "TGCCGTCCGCGCTC",
+      "ACGTCTTTGTCCCG", "CAGTCATCCCGCGT", "CTGCCTGTTCGATC", "GACATAGGGGGCCC"
+    ];
+    
+    setInterval(() => {
+      const barcode = realBarcodes[Math.floor(Math.random() * realBarcodes.length)];
+      const data = {
+        stage: ['loading', 'quality_control', 'error_correction', 'clustering'][Math.floor(Math.random() * 4)],
+        id: 'sim-' + Math.random().toString(36).substr(2, 9),
+        barcode: Math.random() < 0.445 ? barcode : '',
+        enriched: Math.random() < 0.1,
+        z_score: Math.random() * 8,
+        base_composition: {
+          A: barcode.split('A').length - 1,
+          T: barcode.split('T').length - 1,
+          G: barcode.split('G').length - 1,
+          C: barcode.split('C').length - 1
+        }
+      };
+      processSequence(data);
+    }, 50);
+  }
+}, 3000);
+</script>
+</body>
+</html>

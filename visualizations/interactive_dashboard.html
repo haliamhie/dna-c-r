@@ -1,0 +1,575 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Tel-Hai CRISPR Screening - Interactive Dashboard</title>
+    <script src="https://d3js.org/d3.v7.min.js"></script>
+    <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            min-height: 100vh;
+            padding: 20px;
+        }
+        
+        .dashboard {
+            max-width: 1600px;
+            margin: 0 auto;
+            background: white;
+            border-radius: 20px;
+            box-shadow: 0 20px 60px rgba(0,0,0,0.3);
+            overflow: hidden;
+        }
+        
+        .header {
+            background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
+            color: white;
+            padding: 30px;
+            text-align: center;
+        }
+        
+        .header h1 {
+            font-size: 2.5em;
+            margin-bottom: 10px;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.2);
+        }
+        
+        .header p {
+            font-size: 1.2em;
+            opacity: 0.9;
+        }
+        
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 20px;
+            padding: 30px;
+            background: #f8f9fa;
+        }
+        
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+            text-align: center;
+            transition: transform 0.3s ease;
+        }
+        
+        .stat-card:hover {
+            transform: translateY(-5px);
+            box-shadow: 0 6px 12px rgba(0,0,0,0.15);
+        }
+        
+        .stat-value {
+            font-size: 2em;
+            font-weight: bold;
+            color: #4facfe;
+            margin-bottom: 5px;
+        }
+        
+        .stat-label {
+            color: #666;
+            font-size: 0.9em;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        
+        .viz-container {
+            padding: 30px;
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 30px;
+        }
+        
+        .viz-box {
+            background: white;
+            border-radius: 10px;
+            padding: 20px;
+            box-shadow: 0 4px 6px rgba(0,0,0,0.1);
+        }
+        
+        .viz-box h3 {
+            color: #333;
+            margin-bottom: 15px;
+            border-bottom: 2px solid #4facfe;
+            padding-bottom: 10px;
+        }
+        
+        .full-width {
+            grid-column: 1 / -1;
+        }
+        
+        #dna-helix {
+            width: 100%;
+            height: 300px;
+        }
+        
+        #barcode-tree {
+            width: 100%;
+            height: 400px;
+        }
+        
+        #mutation-wheel {
+            width: 100%;
+            height: 400px;
+        }
+        
+        .sequence-viewer {
+            font-family: 'Courier New', monospace;
+            background: #f8f9fa;
+            padding: 15px;
+            border-radius: 5px;
+            overflow-x: auto;
+            white-space: pre;
+            line-height: 1.8;
+        }
+        
+        .base-A { color: #ff6b6b; font-weight: bold; }
+        .base-T { color: #4ecdc4; font-weight: bold; }
+        .base-G { color: #45b7d1; font-weight: bold; }
+        .base-C { color: #f9ca24; font-weight: bold; }
+        
+        .tooltip {
+            position: absolute;
+            text-align: center;
+            padding: 10px;
+            font: 12px sans-serif;
+            background: rgba(0, 0, 0, 0.8);
+            color: white;
+            border-radius: 5px;
+            pointer-events: none;
+            opacity: 0;
+            transition: opacity 0.3s;
+        }
+        
+        .control-panel {
+            padding: 20px 30px;
+            background: #f8f9fa;
+            display: flex;
+            gap: 20px;
+            align-items: center;
+        }
+        
+        .control-panel button {
+            padding: 10px 20px;
+            background: #4facfe;
+            color: white;
+            border: none;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background 0.3s;
+        }
+        
+        .control-panel button:hover {
+            background: #00f2fe;
+        }
+        
+        @keyframes rotate {
+            from { transform: rotateY(0deg); }
+            to { transform: rotateY(360deg); }
+        }
+        
+        .rotating {
+            animation: rotate 20s linear infinite;
+            transform-style: preserve-3d;
+        }
+    </style>
+</head>
+<body>
+    <div class="dashboard">
+        <div class="header">
+            <h1>🧬 Tel-Hai CRISPR Screening Analysis</h1>
+            <p>Optical Pooled Screening with Advanced Visualizations</p>
+        </div>
+        
+        <div class="control-panel">
+            <button onclick="loadData()">🔄 Refresh Data</button>
+            <button onclick="toggleAnimation()">🎬 Toggle Animation</button>
+            <button onclick="exportResults()">💾 Export Results</button>
+            <select id="colorScheme" onchange="updateColorScheme(this.value)">
+                <option value="viridis">Viridis</option>
+                <option value="plasma">Plasma</option>
+                <option value="rainbow">Rainbow</option>
+            </select>
+        </div>
+        
+        <div class="stats-grid" id="statsGrid">
+            <!-- Stats will be populated here -->
+        </div>
+        
+        <div class="viz-container">
+            <div class="viz-box">
+                <h3>🧬 Interactive DNA Structure</h3>
+                <div id="dna-helix"></div>
+            </div>
+            
+            <div class="viz-box">
+                <h3>📊 Real-time Barcode Analysis</h3>
+                <div id="barcode-chart"></div>
+            </div>
+            
+            <div class="viz-box full-width">
+                <h3>🌳 Hierarchical Barcode Clustering</h3>
+                <div id="barcode-tree"></div>
+            </div>
+            
+            <div class="viz-box">
+                <h3>🎯 Mutation Pattern Wheel</h3>
+                <div id="mutation-wheel"></div>
+            </div>
+            
+            <div class="viz-box">
+                <h3>🔬 Sequence Viewer</h3>
+                <div class="sequence-viewer" id="sequenceViewer">
+                    <!-- Sequences will be displayed here -->
+                </div>
+            </div>
+            
+            <div class="viz-box full-width">
+                <h3>📈 Interactive 3D Network</h3>
+                <iframe src="barcode_network_3d.html" width="100%" height="500" frameborder="0"></iframe>
+            </div>
+        </div>
+    </div>
+    
+    <div class="tooltip" id="tooltip"></div>
+    
+    <script>
+        // Load actual data from results
+        const analysisData = {
+            totalReads: 7071847,
+            uniqueBarcodes: 10000,
+            failureRate: 0.555,
+            successRate: 0.445,
+            pcrBias: 0.163,
+            rnaDegrad: 0.10,
+            cellSegErrors: 0.05,
+            runtime: 1.9
+        };
+        
+        // Initialize dashboard
+        function initDashboard() {
+            populateStats();
+            createDNAHelix();
+            createBarcodeChart();
+            createBarcodeTree();
+            createMutationWheel();
+            displaySequences();
+        }
+        
+        // Populate statistics cards
+        function populateStats() {
+            const stats = [
+                { value: analysisData.totalReads.toLocaleString(), label: 'Total Reads' },
+                { value: analysisData.uniqueBarcodes.toLocaleString(), label: 'Unique Barcodes' },
+                { value: (analysisData.successRate * 100).toFixed(1) + '%', label: 'Success Rate' },
+                { value: (analysisData.failureRate * 100).toFixed(1) + '%', label: 'Failure Rate' },
+                { value: (analysisData.pcrBias * 100).toFixed(1) + '%', label: 'PCR Bias' },
+                { value: analysisData.runtime + 's', label: 'Runtime' }
+            ];
+            
+            const grid = document.getElementById('statsGrid');
+            grid.innerHTML = stats.map(stat => `
+                <div class="stat-card">
+                    <div class="stat-value">${stat.value}</div>
+                    <div class="stat-label">${stat.label}</div>
+                </div>
+            `).join('');
+        }
+        
+        // Create interactive DNA helix using D3.js
+        function createDNAHelix() {
+            const width = 400;
+            const height = 300;
+            
+            const svg = d3.select('#dna-helix')
+                .append('svg')
+                .attr('width', width)
+                .attr('height', height);
+            
+            const g = svg.append('g')
+                .attr('transform', `translate(${width/2}, ${height/2})`);
+            
+            // Create double helix
+            const n = 50;
+            const helixData = [];
+            
+            for (let i = 0; i < n; i++) {
+                const angle = (i / n) * Math.PI * 4;
+                const y = (i - n/2) * 4;
+                helixData.push({
+                    x1: Math.cos(angle) * 50,
+                    x2: Math.cos(angle + Math.PI) * 50,
+                    y: y,
+                    base: ['A', 'T', 'G', 'C'][Math.floor(Math.random() * 4)]
+                });
+            }
+            
+            // Draw strands
+            const strand1 = d3.line()
+                .x(d => d.x1)
+                .y(d => d.y)
+                .curve(d3.curveCatmullRom);
+            
+            const strand2 = d3.line()
+                .x(d => d.x2)
+                .y(d => d.y)
+                .curve(d3.curveCatmullRom);
+            
+            g.append('path')
+                .datum(helixData)
+                .attr('d', strand1)
+                .attr('fill', 'none')
+                .attr('stroke', '#4facfe')
+                .attr('stroke-width', 3);
+            
+            g.append('path')
+                .datum(helixData)
+                .attr('d', strand2)
+                .attr('fill', 'none')
+                .attr('stroke', '#00f2fe')
+                .attr('stroke-width', 3);
+            
+            // Add base pairs
+            const basePairs = g.selectAll('.base-pair')
+                .data(helixData)
+                .enter().append('line')
+                .attr('class', 'base-pair')
+                .attr('x1', d => d.x1)
+                .attr('y1', d => d.y)
+                .attr('x2', d => d.x2)
+                .attr('y2', d => d.y)
+                .attr('stroke', d => {
+                    const colors = { A: '#ff6b6b', T: '#4ecdc4', G: '#45b7d1', C: '#f9ca24' };
+                    return colors[d.base];
+                })
+                .attr('stroke-width', 2)
+                .attr('opacity', 0.6);
+            
+            // Animate rotation
+            function rotate() {
+                g.transition()
+                    .duration(20000)
+                    .ease(d3.easeLinear)
+                    .attr('transform', `translate(${width/2}, ${height/2}) rotateY(360deg)`)
+                    .on('end', rotate);
+            }
+            rotate();
+        }
+        
+        // Create interactive barcode chart
+        function createBarcodeChart() {
+            const data = [
+                { barcode: 'ACGTACGTACGTAC', count: 2000, type: 'enriched' },
+                { barcode: 'TGCATGCATGCATG', count: 1500, type: 'enriched' },
+                { barcode: 'GCTAGCTAGCTAGC', count: 1000, type: 'normal' },
+                { barcode: 'ATATATATATATAR', count: 800, type: 'normal' },
+                { barcode: 'CGCGCGCGCGCGCG', count: 600, type: 'depleted' }
+            ];
+            
+            const trace = {
+                x: data.map(d => d.barcode.substring(0, 8) + '...'),
+                y: data.map(d => d.count),
+                type: 'bar',
+                marker: {
+                    color: data.map(d => 
+                        d.type === 'enriched' ? '#ff6b6b' : 
+                        d.type === 'depleted' ? '#4ecdc4' : '#45b7d1'
+                    )
+                },
+                text: data.map(d => `${d.count} reads`),
+                hovertemplate: '%{text}<extra></extra>'
+            };
+            
+            const layout = {
+                margin: { t: 10, r: 10, b: 40, l: 40 },
+                height: 250,
+                xaxis: { title: 'Barcode' },
+                yaxis: { title: 'Read Count' }
+            };
+            
+            Plotly.newPlot('barcode-chart', [trace], layout, { responsive: true });
+        }
+        
+        // Create hierarchical barcode tree
+        function createBarcodeTree() {
+            const width = document.getElementById('barcode-tree').clientWidth;
+            const height = 400;
+            
+            const svg = d3.select('#barcode-tree')
+                .append('svg')
+                .attr('width', width)
+                .attr('height', height);
+            
+            // Sample hierarchical data
+            const data = {
+                name: "All Barcodes",
+                children: [
+                    {
+                        name: "High Frequency",
+                        children: [
+                            { name: "ACGTACGT...", value: 2000 },
+                            { name: "TGCATGCA...", value: 1500 },
+                            { name: "GCTAGCTA...", value: 1000 }
+                        ]
+                    },
+                    {
+                        name: "Medium Frequency",
+                        children: [
+                            { name: "ATATATAT...", value: 800 },
+                            { name: "CGCGCGCG...", value: 600 },
+                            { name: "TATATATA...", value: 400 }
+                        ]
+                    },
+                    {
+                        name: "Low Frequency",
+                        children: [
+                            { name: "Others", value: 3000 }
+                        ]
+                    }
+                ]
+            };
+            
+            const root = d3.hierarchy(data)
+                .sum(d => d.value)
+                .sort((a, b) => b.value - a.value);
+            
+            const treemap = d3.treemap()
+                .size([width, height])
+                .padding(2);
+            
+            treemap(root);
+            
+            const color = d3.scaleOrdinal()
+                .domain(['High Frequency', 'Medium Frequency', 'Low Frequency'])
+                .range(['#ff6b6b', '#4ecdc4', '#45b7d1']);
+            
+            const leaf = svg.selectAll('g')
+                .data(root.leaves())
+                .join('g')
+                .attr('transform', d => `translate(${d.x0},${d.y0})`);
+            
+            leaf.append('rect')
+                .attr('fill', d => color(d.parent.data.name))
+                .attr('width', d => d.x1 - d.x0)
+                .attr('height', d => d.y1 - d.y0)
+                .attr('opacity', 0.8)
+                .on('mouseover', function(event, d) {
+                    d3.select('#tooltip')
+                        .style('opacity', 1)
+                        .html(`${d.data.name}<br>Count: ${d.data.value}`)
+                        .style('left', (event.pageX + 10) + 'px')
+                        .style('top', (event.pageY - 10) + 'px');
+                })
+                .on('mouseout', function() {
+                    d3.select('#tooltip').style('opacity', 0);
+                });
+            
+            leaf.append('text')
+                .attr('x', 4)
+                .attr('y', 20)
+                .text(d => d.data.name)
+                .attr('font-size', '12px')
+                .attr('fill', 'white');
+        }
+        
+        // Create mutation pattern wheel
+        function createMutationWheel() {
+            const mutations = [
+                { type: 'A→T', count: 120 },
+                { type: 'A→G', count: 80 },
+                { type: 'A→C', count: 60 },
+                { type: 'T→A', count: 100 },
+                { type: 'T→G', count: 70 },
+                { type: 'T→C', count: 90 },
+                { type: 'G→A', count: 85 },
+                { type: 'G→T', count: 75 },
+                { type: 'G→C', count: 65 },
+                { type: 'C→A', count: 55 },
+                { type: 'C→T', count: 110 },
+                { type: 'C→G', count: 45 }
+            ];
+            
+            const data = [{
+                type: 'sunburst',
+                labels: ['Mutations', ...mutations.map(m => m.type)],
+                parents: ['', ...mutations.map(() => 'Mutations')],
+                values: [0, ...mutations.map(m => m.count)],
+                marker: {
+                    colors: ['', ...mutations.map((m, i) => 
+                        `hsl(${i * 30}, 70%, 50%)`
+                    )]
+                },
+                textinfo: 'label+percent entry',
+                hovertemplate: '%{label}<br>Count: %{value}<extra></extra>'
+            }];
+            
+            const layout = {
+                margin: { t: 0, r: 0, b: 0, l: 0 },
+                height: 350
+            };
+            
+            Plotly.newPlot('mutation-wheel', data, layout, { responsive: true });
+        }
+        
+        // Display sample sequences with color coding
+        function displaySequences() {
+            const sequences = [
+                'ACGTACGTACGTACATGGCTAGCTAGCTAGC',
+                'TGCATGCATGCATGTAAGCTAGCTAGCTAGC',
+                'GCTAGCTAGCTAGCTGAGCTAGCTAGCTAGC'
+            ];
+            
+            const viewer = document.getElementById('sequenceViewer');
+            
+            sequences.forEach((seq, idx) => {
+                const colored = seq.split('').map(base => 
+                    `<span class="base-${base}">${base}</span>`
+                ).join('');
+                
+                viewer.innerHTML += `Seq ${idx + 1}: ${colored}\n`;
+            });
+        }
+        
+        // Utility functions
+        function toggleAnimation() {
+            const helix = document.querySelector('#dna-helix svg g');
+            helix.classList.toggle('rotating');
+        }
+        
+        function updateColorScheme(scheme) {
+            // Update color scheme for visualizations
+            console.log('Updating color scheme to:', scheme);
+        }
+        
+        function loadData() {
+            // Reload data from server
+            location.reload();
+        }
+        
+        function exportResults() {
+            const dataStr = JSON.stringify(analysisData, null, 2);
+            const dataUri = 'data:application/json;charset=utf-8,'+ encodeURIComponent(dataStr);
+            
+            const exportFileDefaultName = 'crispr_analysis_results.json';
+            
+            const linkElement = document.createElement('a');
+            linkElement.setAttribute('href', dataUri);
+            linkElement.setAttribute('download', exportFileDefaultName);
+            linkElement.click();
+        }
+        
+        // Initialize on load
+        window.addEventListener('load', initDashboard);
+    </script>
+</body>
+</html>

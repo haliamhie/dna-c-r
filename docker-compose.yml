@@ -1,0 +1,50 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    ports:
+      - "8000:8000"
+    environment:
+      - NVIDIA_API_KEY=${NVIDIA_API_KEY}
+      - MODEL_TYPE=ensemble
+      - LOG_LEVEL=INFO
+    volumes:
+      - ./artifacts:/app/artifacts:ro
+      - ./models:/app/models
+      - ./logs:/app/logs
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8000/api/stats"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+
+  frontend:
+    image: nginx:alpine
+    ports:
+      - "80:80"
+    volumes:
+      - ./frontend:/usr/share/nginx/html:ro
+      - ./nginx.conf:/etc/nginx/nginx.conf:ro
+    depends_on:
+      - backend
+    restart: unless-stopped
+
+  model-trainer:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile.trainer
+    volumes:
+      - ./artifacts:/app/artifacts:ro
+      - ./models:/app/models
+      - ./logs:/app/logs
+    environment:
+      - TRAINING_SCHEDULE=0 2 * * *  # Run at 2 AM daily
+    restart: unless-stopped
+
+networks:
+  default:
+    name: crispr-network

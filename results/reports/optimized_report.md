@@ -1,5 +1,5 @@
 # Optical Pooled CRISPR Screening Report
-Generated: 2025-08-13T16:24:44.285990
+Generated: 2025-08-13T17:40:03.238660
 
 ## Executive Summary
 - **Total Barcodes**: 10000
@@ -20,7 +20,7 @@ Generated: 2025-08-13T16:24:44.285990
 
 ### Failure Analysis
 - Synthesis Errors: 0.0%
-- Pcr Amplification Bias: 16.9%
+- Pcr Amplification Bias: 16.7%
 - Insufficient Phix: 0.0%
 - Contamination: 0.0%
 - Rna Degradation: 10.0%

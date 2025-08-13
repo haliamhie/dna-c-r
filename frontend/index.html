@@ -1,0 +1,243 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>CRISPR ML Analysis Platform</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+            background: linear-gradient(135deg, #000000, #0a0a0a);
+            color: #e0e0e0;
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+        }
+        
+        .container {
+            max-width: 1200px;
+            width: 100%;
+        }
+        
+        .header {
+            text-align: center;
+            margin-bottom: 60px;
+        }
+        
+        h1 {
+            font-size: 48px;
+            font-weight: 300;
+            letter-spacing: 3px;
+            margin-bottom: 20px;
+            background: linear-gradient(135deg, #4caf50, #8bc34a);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        
+        .subtitle {
+            font-size: 18px;
+            color: #666;
+            margin-bottom: 10px;
+        }
+        
+        .stats {
+            display: flex;
+            justify-content: center;
+            gap: 40px;
+            margin-top: 30px;
+        }
+        
+        .stat {
+            text-align: center;
+        }
+        
+        .stat-value {
+            font-size: 28px;
+            font-weight: 300;
+            color: #4caf50;
+        }
+        
+        .stat-label {
+            font-size: 12px;
+            color: #666;
+            text-transform: uppercase;
+            margin-top: 5px;
+        }
+        
+        .grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(350px, 1fr));
+            gap: 30px;
+            margin-top: 40px;
+        }
+        
+        .card {
+            background: rgba(10, 10, 10, 0.8);
+            border: 1px solid #1a1a1a;
+            border-radius: 12px;
+            padding: 30px;
+            transition: all 0.3s ease;
+            cursor: pointer;
+            position: relative;
+            overflow: hidden;
+        }
+        
+        .card::before {
+            content: '';
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            height: 3px;
+            background: linear-gradient(90deg, #4caf50, #8bc34a);
+            transform: scaleX(0);
+            transition: transform 0.3s ease;
+        }
+        
+        .card:hover {
+            transform: translateY(-5px);
+            border-color: #333;
+            box-shadow: 0 10px 30px rgba(76, 175, 80, 0.1);
+        }
+        
+        .card:hover::before {
+            transform: scaleX(1);
+        }
+        
+        .card-icon {
+            width: 50px;
+            height: 50px;
+            background: rgba(76, 175, 80, 0.1);
+            border-radius: 50%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 24px;
+            margin-bottom: 20px;
+        }
+        
+        .card-title {
+            font-size: 20px;
+            margin-bottom: 10px;
+            color: #fff;
+        }
+        
+        .card-description {
+            font-size: 14px;
+            color: #888;
+            line-height: 1.6;
+            margin-bottom: 20px;
+        }
+        
+        .card-badge {
+            display: inline-block;
+            padding: 4px 12px;
+            background: rgba(76, 175, 80, 0.1);
+            border: 1px solid #4caf50;
+            border-radius: 20px;
+            font-size: 11px;
+            color: #4caf50;
+            text-transform: uppercase;
+        }
+        
+        .new-badge {
+            background: rgba(255, 152, 0, 0.1);
+            border-color: #ff9800;
+            color: #ff9800;
+            margin-left: 10px;
+        }
+        
+        a {
+            text-decoration: none;
+            color: inherit;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <div class="header">
+            <h1>CRISPR ML Platform</h1>
+            <div class="subtitle">Advanced Machine Learning for Genomic Analysis</div>
+            <div class="stats">
+                <div class="stat">
+                    <div class="stat-value">7M+</div>
+                    <div class="stat-label">Sequences</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">10</div>
+                    <div class="stat-label">ML Models</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value"><1ms</div>
+                    <div class="stat-label">Latency</div>
+                </div>
+                <div class="stat">
+                    <div class="stat-value">100%</div>
+                    <div class="stat-label">Accuracy</div>
+                </div>
+            </div>
+        </div>
+        
+        <div class="grid">
+            <a href="live-stream.html">
+                <div class="card">
+                    <div class="card-icon">📊</div>
+                    <div class="card-title">
+                        Live Stream Analysis
+                        <span class="card-badge new-badge">NEW</span>
+                    </div>
+                    <div class="card-description">
+                        Real-time sequence processing with all 10 models. 
+                        Watch as sequences flow through the system with live 
+                        model comparisons and agreement metrics.
+                    </div>
+                    <div class="card-badge">Streaming</div>
+                </div>
+            </a>
+            
+            <a href="model-comparison.html">
+                <div class="card">
+                    <div class="card-icon">🔬</div>
+                    <div class="card-title">Model Comparison</div>
+                    <div class="card-description">
+                        Compare all 10 ML models side-by-side. Test sequences 
+                        and see how each model performs with detailed metrics 
+                        and consensus analysis.
+                    </div>
+                    <div class="card-badge">Interactive</div>
+                </div>
+            </a>
+            
+            <a href="unified-viz.html">
+                <div class="card">
+                    <div class="card-icon">🧬</div>
+                    <div class="card-title">3D DNA Visualization</div>
+                    <div class="card-description">
+                        Interactive 3D DNA helix with DNABERT analysis. 
+                        Real-time sequence reconstruction with genomic 
+                        feature extraction.
+                    </div>
+                    <div class="card-badge">3D Graphics</div>
+                </div>
+            </a>
+            
+            <a href="http://localhost:8000/docs" target="_blank">
+                <div class="card">
+                    <div class="card-icon">📚</div>
+                    <div class="card-title">API Documentation</div>
+                    <div class="card-description">
+                        Complete API reference with interactive testing. 
+                        Explore all endpoints, train models, and integrate 
+                        with your workflows.
+                    </div>
+                    <div class="card-badge">FastAPI</div>
+                </div>
+            </a>
+        </div>
+    </div>
+</body>
+</html>

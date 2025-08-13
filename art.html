@@ -1,0 +1,496 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>DNA SEQUENCES AS ART</title>
+<style>
+body {
+    margin: 0;
+    padding: 0;
+    background: #000;
+    overflow: hidden;
+    font-family: 'Helvetica Neue', sans-serif;
+}
+
+#canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+    cursor: crosshair;
+}
+
+#title {
+    position: absolute;
+    top: 20px;
+    left: 50%;
+    transform: translateX(-50%);
+    color: rgba(255, 255, 255, 0.1);
+    font-size: 48px;
+    font-weight: 100;
+    letter-spacing: 20px;
+    pointer-events: none;
+    z-index: 10;
+}
+
+#stats {
+    position: absolute;
+    bottom: 20px;
+    left: 20px;
+    color: rgba(255, 255, 255, 0.3);
+    font-size: 11px;
+    font-family: monospace;
+    line-height: 1.6;
+    pointer-events: none;
+}
+
+#controls {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    display: flex;
+    gap: 20px;
+}
+
+.control {
+    width: 40px;
+    height: 40px;
+    border: 1px solid rgba(255, 255, 255, 0.2);
+    background: rgba(0, 0, 0, 0.5);
+    color: rgba(255, 255, 255, 0.5);
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    transition: all 0.3s;
+}
+
+.control:hover {
+    border-color: rgba(255, 255, 255, 0.8);
+    color: rgba(255, 255, 255, 1);
+}
+</style>
+</head>
+<body>
+
+<div id="title">GENOME</div>
+<svg id="canvas"></svg>
+<div id="stats"></div>
+<div id="controls">
+    <div class="control" onclick="changeMode()">M</div>
+    <div class="control" onclick="toggleFlow()">F</div>
+    <div class="control" onclick="resetVisualization()">R</div>
+</div>
+
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+
+const width = window.innerWidth;
+const height = window.innerHeight;
+
+const svg = d3.select('#canvas')
+    .attr('width', width)
+    .attr('height', height);
+
+// Create filters for visual effects
+const defs = svg.append('defs');
+
+// Glow filter
+const filter = defs.append('filter')
+    .attr('id', 'glow');
+
+filter.append('feGaussianBlur')
+    .attr('stdDeviation', '3')
+    .attr('result', 'coloredBlur');
+
+const feMerge = filter.append('feMerge');
+feMerge.append('feMergeNode')
+    .attr('in', 'coloredBlur');
+feMerge.append('feMergeNode')
+    .attr('in', 'SourceGraphic');
+
+// Gradient definitions
+const gradient = defs.append('linearGradient')
+    .attr('id', 'gradient')
+    .attr('x1', '0%')
+    .attr('y1', '0%')
+    .attr('x2', '100%')
+    .attr('y2', '100%');
+
+gradient.append('stop')
+    .attr('offset', '0%')
+    .style('stop-color', '#00ffff')
+    .style('stop-opacity', 0.8);
+
+gradient.append('stop')
+    .attr('offset', '50%')
+    .style('stop-color', '#ff00ff')
+    .style('stop-opacity', 0.5);
+
+gradient.append('stop')
+    .attr('offset', '100%')
+    .style('stop-color', '#ffff00')
+    .style('stop-opacity', 0.3);
+
+// Data structures
+const bases = ['A', 'T', 'G', 'C'];
+const baseColors = {
+    'A': '#FF006E',
+    'T': '#FB5607',
+    'G': '#FFBE0B',
+    'C': '#8338EC'
+};
+
+// Generate DNA sequences
+function generateSequence(length) {
+    return Array.from({length}, () => bases[Math.floor(Math.random() * 4)]);
+}
+
+// Create particle system for DNA bases
+class Particle {
+    constructor(x, y, base) {
+        this.x = x;
+        this.y = y;
+        this.vx = (Math.random() - 0.5) * 2;
+        this.vy = (Math.random() - 0.5) * 2;
+        this.base = base;
+        this.life = 1.0;
+        this.decay = Math.random() * 0.01 + 0.001;
+        this.size = Math.random() * 3 + 1;
+        this.angle = Math.random() * Math.PI * 2;
+        this.angleVelocity = (Math.random() - 0.5) * 0.1;
+    }
+    
+    update() {
+        this.x += this.vx;
+        this.y += this.vy;
+        this.life -= this.decay;
+        this.angle += this.angleVelocity;
+        
+        // Add gravity or forces
+        this.vy += 0.05;
+        
+        // Boundary behavior
+        if (this.x < 0 || this.x > width) this.vx *= -0.8;
+        if (this.y < 0 || this.y > height) this.vy *= -0.8;
+        
+        return this.life > 0;
+    }
+}
+
+let particles = [];
+let sequences = [];
+let mode = 'spiral';
+let flowing = true;
+
+// Initialize sequences
+for (let i = 0; i < 100; i++) {
+    sequences.push({
+        seq: generateSequence(50),
+        x: Math.random() * width,
+        y: Math.random() * height,
+        angle: Math.random() * Math.PI * 2,
+        speed: Math.random() * 0.5 + 0.1,
+        radius: Math.random() * 200 + 100
+    });
+}
+
+// Main visualization container
+const mainGroup = svg.append('g');
+const particleGroup = svg.append('g');
+const sequenceGroup = svg.append('g');
+
+// Draw spiral DNA visualization
+function drawSpiral() {
+    sequenceGroup.selectAll('*').remove();
+    
+    const spirals = sequenceGroup.selectAll('.spiral')
+        .data(sequences)
+        .enter()
+        .append('g')
+        .attr('class', 'spiral')
+        .attr('transform', d => `translate(${d.x}, ${d.y})`);
+    
+    sequences.forEach((seqData, idx) => {
+        const spiral = spirals.filter((d, i) => i === idx);
+        
+        const points = seqData.seq.map((base, i) => {
+            const angle = (i / seqData.seq.length) * Math.PI * 4 + seqData.angle;
+            const radius = (i / seqData.seq.length) * seqData.radius;
+            return {
+                x: Math.cos(angle) * radius,
+                y: Math.sin(angle) * radius,
+                base: base
+            };
+        });
+        
+        // Draw connections
+        const line = d3.line()
+            .x(d => d.x)
+            .y(d => d.y)
+            .curve(d3.curveBasis);
+        
+        spiral.append('path')
+            .datum(points)
+            .attr('d', line)
+            .attr('fill', 'none')
+            .attr('stroke', 'url(#gradient)')
+            .attr('stroke-width', 0.5)
+            .attr('opacity', 0.3);
+        
+        // Draw bases
+        spiral.selectAll('.base')
+            .data(points)
+            .enter()
+            .append('circle')
+            .attr('class', 'base')
+            .attr('cx', d => d.x)
+            .attr('cy', d => d.y)
+            .attr('r', d => Math.sin(points.indexOf(d) * 0.1) * 2 + 2)
+            .attr('fill', d => baseColors[d.base])
+            .attr('opacity', 0.6)
+            .attr('filter', 'url(#glow)');
+    });
+}
+
+// Draw network visualization
+function drawNetwork() {
+    sequenceGroup.selectAll('*').remove();
+    
+    const nodes = [];
+    const links = [];
+    
+    // Create nodes from sequences
+    sequences.forEach((seq, i) => {
+        seq.seq.forEach((base, j) => {
+            if (j % 5 === 0) { // Sample every 5th base
+                nodes.push({
+                    id: `${i}-${j}`,
+                    x: seq.x + Math.cos(j * 0.1) * 100,
+                    y: seq.y + Math.sin(j * 0.1) * 100,
+                    base: base,
+                    seqIndex: i
+                });
+            }
+        });
+    });
+    
+    // Create links based on base complementarity
+    nodes.forEach((node1, i) => {
+        nodes.forEach((node2, j) => {
+            if (i < j && node1.seqIndex !== node2.seqIndex) {
+                const complement = (node1.base === 'A' && node2.base === 'T') ||
+                                 (node1.base === 'T' && node2.base === 'A') ||
+                                 (node1.base === 'G' && node2.base === 'C') ||
+                                 (node1.base === 'C' && node2.base === 'G');
+                
+                if (complement && Math.random() > 0.95) {
+                    links.push({
+                        source: node1,
+                        target: node2
+                    });
+                }
+            }
+        });
+    });
+    
+    // Draw links
+    sequenceGroup.selectAll('.link')
+        .data(links)
+        .enter()
+        .append('line')
+        .attr('class', 'link')
+        .attr('x1', d => d.source.x)
+        .attr('y1', d => d.source.y)
+        .attr('x2', d => d.target.x)
+        .attr('y2', d => d.target.y)
+        .attr('stroke', 'rgba(255, 255, 255, 0.1)')
+        .attr('stroke-width', 0.5);
+    
+    // Draw nodes
+    sequenceGroup.selectAll('.node')
+        .data(nodes)
+        .enter()
+        .append('circle')
+        .attr('class', 'node')
+        .attr('cx', d => d.x)
+        .attr('cy', d => d.y)
+        .attr('r', 3)
+        .attr('fill', d => baseColors[d.base])
+        .attr('opacity', 0.8)
+        .attr('filter', 'url(#glow)');
+}
+
+// Draw flow field visualization
+function drawFlowField() {
+    sequenceGroup.selectAll('*').remove();
+    
+    const cols = 40;
+    const rows = 30;
+    const cellWidth = width / cols;
+    const cellHeight = height / rows;
+    
+    for (let i = 0; i < cols; i++) {
+        for (let j = 0; j < rows; j++) {
+            const x = i * cellWidth + cellWidth / 2;
+            const y = j * cellHeight + cellHeight / 2;
+            
+            // Calculate flow based on nearby sequences
+            let flowAngle = 0;
+            let flowStrength = 0;
+            
+            sequences.forEach(seq => {
+                const dx = seq.x - x;
+                const dy = seq.y - y;
+                const dist = Math.sqrt(dx * dx + dy * dy);
+                
+                if (dist < 200) {
+                    flowAngle += Math.atan2(dy, dx);
+                    flowStrength += (200 - dist) / 200;
+                }
+            });
+            
+            flowAngle += Math.sin(i * 0.1) * Math.cos(j * 0.1);
+            
+            const endX = x + Math.cos(flowAngle) * cellWidth * 0.8;
+            const endY = y + Math.sin(flowAngle) * cellHeight * 0.8;
+            
+            sequenceGroup.append('line')
+                .attr('x1', x)
+                .attr('y1', y)
+                .attr('x2', endX)
+                .attr('y2', endY)
+                .attr('stroke', `rgba(255, 255, 255, ${flowStrength * 0.3})`)
+                .attr('stroke-width', flowStrength * 2);
+        }
+    }
+}
+
+// Update particles
+function updateParticles() {
+    particles = particles.filter(p => p.update());
+    
+    // Add new particles
+    if (particles.length < 500 && Math.random() > 0.8) {
+        const base = bases[Math.floor(Math.random() * 4)];
+        particles.push(new Particle(
+            Math.random() * width,
+            0,
+            base
+        ));
+    }
+    
+    // Draw particles
+    const particleSelection = particleGroup.selectAll('.particle')
+        .data(particles, d => d.id);
+    
+    particleSelection.exit().remove();
+    
+    particleSelection.enter()
+        .append('circle')
+        .attr('class', 'particle')
+        .merge(particleSelection)
+        .attr('cx', d => d.x)
+        .attr('cy', d => d.y)
+        .attr('r', d => d.size * d.life)
+        .attr('fill', d => baseColors[d.base])
+        .attr('opacity', d => d.life * 0.8);
+}
+
+// Update sequences
+function updateSequences() {
+    if (!flowing) return;
+    
+    sequences.forEach(seq => {
+        seq.angle += seq.speed * 0.02;
+        seq.x += Math.cos(seq.angle) * seq.speed;
+        seq.y += Math.sin(seq.angle) * seq.speed;
+        
+        // Wrap around
+        if (seq.x < -200) seq.x = width + 200;
+        if (seq.x > width + 200) seq.x = -200;
+        if (seq.y < -200) seq.y = height + 200;
+        if (seq.y > height + 200) seq.y = -200;
+    });
+}
+
+// Animation loop
+function animate() {
+    updateSequences();
+    updateParticles();
+    
+    if (mode === 'spiral') drawSpiral();
+    else if (mode === 'network') drawNetwork();
+    else if (mode === 'flow') drawFlowField();
+    
+    // Update stats
+    d3.select('#stats').html(`
+        PARTICLES: ${particles.length}<br>
+        SEQUENCES: ${sequences.length}<br>
+        MODE: ${mode.toUpperCase()}<br>
+        FPS: ${Math.round(1000 / 16)}
+    `);
+    
+    requestAnimationFrame(animate);
+}
+
+// Control functions
+function changeMode() {
+    const modes = ['spiral', 'network', 'flow'];
+    const currentIndex = modes.indexOf(mode);
+    mode = modes[(currentIndex + 1) % modes.length];
+}
+
+function toggleFlow() {
+    flowing = !flowing;
+}
+
+function resetVisualization() {
+    particles = [];
+    sequences = [];
+    for (let i = 0; i < 100; i++) {
+        sequences.push({
+            seq: generateSequence(50),
+            x: Math.random() * width,
+            y: Math.random() * height,
+            angle: Math.random() * Math.PI * 2,
+            speed: Math.random() * 0.5 + 0.1,
+            radius: Math.random() * 200 + 100
+        });
+    }
+}
+
+// Mouse interaction
+svg.on('mousemove', function(event) {
+    const [mx, my] = d3.pointer(event);
+    
+    // Create particles at mouse position
+    if (Math.random() > 0.7) {
+        const base = bases[Math.floor(Math.random() * 4)];
+        particles.push(new Particle(mx, my, base));
+    }
+    
+    // Influence nearby sequences
+    sequences.forEach(seq => {
+        const dx = seq.x - mx;
+        const dy = seq.y - my;
+        const dist = Math.sqrt(dx * dx + dy * dy);
+        
+        if (dist < 100) {
+            seq.x += dx * 0.01;
+            seq.y += dy * 0.01;
+        }
+    });
+});
+
+// Start animation
+animate();
+
+// Resize handler
+window.addEventListener('resize', () => {
+    location.reload();
+});
+
+</script>
+
+</body>
+</html>

@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>EXACT CRISPR Data - 95% Real</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #000;
+  font-family: 'Courier New', monospace;
+  color: #fff;
+  overflow: hidden;
+}
+
+#exact-metrics {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  width: 380px;
+  background: rgba(0,0,10,0.95);
+  border: 1px solid #00ff00;
+  padding: 15px;
+  z-index: 1000;
+}
+
+.exact-stat {
+  display: flex;
+  justify-content: space-between;
+  margin: 8px 0;
+  padding: 5px;
+  background: rgba(0,255,0,0.05);
+  border-left: 3px solid #00ff00;
+}
+
+.exact-label {
+  font-size: 11px;
+  color: #aaa;
+}
+
+.exact-value {
+  font-size: 14px;
+  font-weight: bold;
+  color: #00ff00;
+  text-shadow: 0 0 5px currentColor;
+}
+
+#sequence-display {
+  position: absolute;
+  top: 10px;
+  right: 10px;
+  width: 400px;
+  height: 300px;
+  background: rgba(0,0,0,0.95);
+  border: 1px solid #00ffff;
+  padding: 10px;
+  overflow-y: auto;
+  font-size: 10px;
+  z-index: 1000;
+}
+
+.seq-entry {
+  margin: 2px 0;
+  padding: 3px;
+  font-family: monospace;
+  border-bottom: 1px solid rgba(0,255,255,0.1);
+}
+
+.seq-id { color: #666; font-size: 8px; }
+.seq-barcode { color: #00ff00; font-weight: bold; }
+.seq-failed { color: #ff0000; }
+.seq-enriched { 
+  color: #ff00ff; 
+  background: rgba(255,0,255,0.1);
+  font-size: 11px;
+}
+
+#pipeline-flow {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 80%;
+  height: 200px;
+}
+
+.pipeline-stage {
+  position: absolute;
+  width: 140px;
+  height: 140px;
+  border: 2px solid #00ffff;
+  border-radius: 70px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  background: radial-gradient(circle, rgba(0,255,255,0.1), transparent);
+}
+
+.pipeline-stage.active {
+  animation: pulse-exact 0.5s;
+}
+
+@keyframes pulse-exact {
+  0% { transform: scale(1); }
+  50% { transform: scale(1.2); box-shadow: 0 0 30px #00ff00; }
+  100% { transform: scale(1); }
+}
+
+.stage-name {
+  font-size: 10px;
+  text-transform: uppercase;
+  color: #00ffff;
+}
+
+.stage-count {
+  font-size: 24px;
+  font-weight: bold;
+  color: #00ff00;
+  margin: 5px 0;
+}
+
+.stage-percent {
+  font-size: 9px;
+  color: #999;
+}
+
+#barcode-matrix {
+  position: absolute;
+  bottom: 10px;
+  left: 10px;
+  right: 10px;
+  height: 200px;
+  background: rgba(0,0,0,0.9);
+  border: 1px solid #00ff00;
+  overflow: hidden;
+}
+
+.matrix-row {
+  display: flex;
+  height: 10px;
+  margin: 1px 0;
+}
+
+.matrix-cell {
+  flex: 1;
+  margin: 0 1px;
+  transition: all 0.3s;
+}
+
+.base-A { background: #ff0000; }
+.base-T { background: #0000ff; }
+.base-G { background: #ffff00; }
+.base-C { background: #00ff00; }
+
+#progress-bar {
+  position: absolute;
+  bottom: 220px;
+  left: 10px;
+  right: 10px;
+  height: 30px;
+  background: rgba(0,0,0,0.9);
+  border: 1px solid #00ff00;
+}
+
+.progress-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00ff00, #00ffff);
+  transition: width 0.5s;
+  position: relative;
+  overflow: hidden;
+}
+
+.progress-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+  font-weight: bold;
+  color: #000;
+  text-shadow: 0 0 3px #fff;
+}
+
+#hamming-display {
+  position: absolute;
+  top: 330px;
+  right: 10px;
+  width: 400px;
+  height: 150px;
+  background: rgba(0,0,0,0.95);
+  border: 1px solid #ff00ff;
+  padding: 10px;
+}
+
+.hamming-grid {
+  display: grid;
+  grid-template-columns: repeat(14, 1fr);
+  gap: 2px;
+  margin-top: 10px;
+}
+
+.hamming-cell {
+  width: 20px;
+  height: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 10px;
+  border: 1px solid #333;
+}
+
+.hamming-match { background: #00ff00; color: #000; }
+.hamming-mismatch { background: #ff0000; color: #fff; }
+
+#enrichment-chart {
+  position: absolute;
+  bottom: 220px;
+  right: 10px;
+  width: 300px;
+  height: 100px;
+  background: rgba(0,0,0,0.95);
+  border: 1px solid #ff00ff;
+  padding: 10px;
+}
+
+.enrichment-bar {
+  display: inline-block;
+  width: 5px;
+  background: #ff00ff;
+  margin: 0 1px;
+  vertical-align: bottom;
+  transition: height 0.3s;
+}
+
+#speed-control {
+  position: absolute;
+  top: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(0,0,0,0.9);
+  padding: 10px;
+  border: 1px solid #00ff00;
+  border-radius: 20px;
+  z-index: 2000;
+}
+
+.speed-label {
+  display: inline-block;
+  margin-right: 10px;
+  font-size: 11px;
+}
+
+#speed-slider {
+  width: 150px;
+  vertical-align: middle;
+}
+
+#speed-value {
+  display: inline-block;
+  margin-left: 10px;
+  color: #00ff00;
+  font-weight: bold;
+}
+</style>
+</head>
+<body>
+
+<div id="exact-metrics">
+  <h3 style="color: #00ff00; margin-bottom: 10px;">EXACT DATA STREAM</h3>
+  <div class="exact-stat">
+    <span class="exact-label">TOTAL SEQUENCES</span>
+    <span class="exact-value" id="total-seq">7,071,847</span>
+  </div>
+  <div class="exact-stat">
+    <span class="exact-label">PROCESSED</span>
+    <span class="exact-value" id="processed">0</span>
+  </div>
+  <div class="exact-stat">
+    <span class="exact-label">SUCCESS RATE</span>
+    <span class="exact-value" id="success-rate">0.0%</span>
+  </div>
+  <div class="exact-stat">
+    <span class="exact-label">UNIQUE BARCODES</span>
+    <span class="exact-value" id="unique">0</span>
+  </div>
+  <div class="exact-stat">
+    <span class="exact-label">ENRICHED FOUND</span>
+    <span class="exact-value" id="enriched" style="color: #ff00ff;">0</span>
+  </div>
+  <div class="exact-stat">
+    <span class="exact-label">MEAN COVERAGE</span>
+    <span class="exact-value" id="coverage">0</span>
+  </div>
+  <div class="exact-stat">
+    <span class="exact-label">CURRENT POSITION</span>
+    <span class="exact-value" id="position">0</span>
+  </div>
+</div>
+
+<div id="sequence-display">
+  <div style="font-weight: bold; color: #00ffff; margin-bottom: 5px;">LIVE SEQUENCES</div>
+  <div id="seq-list"></div>
+</div>
+
+<div id="pipeline-flow">
+  <div class="pipeline-stage" style="left: 0%;" id="stage-loading">
+    <div class="stage-name">Loading</div>
+    <div class="stage-count" id="count-loading">0</div>
+    <div class="stage-percent" id="percent-loading">0%</div>
+  </div>
+  <div class="pipeline-stage" style="left: 20%;" id="stage-qc">
+    <div class="stage-name">Quality Control</div>
+    <div class="stage-count" id="count-qc">0</div>
+    <div class="stage-percent" id="percent-qc">0%</div>
+  </div>
+  <div class="pipeline-stage" style="left: 40%;" id="stage-error">
+    <div class="stage-name">Error Correction</div>
+    <div class="stage-count" id="count-error">0</div>
+    <div class="stage-percent" id="percent-error">0%</div>
+  </div>
+  <div class="pipeline-stage" style="left: 60%;" id="stage-cluster">
+    <div class="stage-name">Clustering</div>
+    <div class="stage-count" id="count-cluster">0</div>
+    <div class="stage-percent" id="percent-cluster">0%</div>
+  </div>
+  <div class="pipeline-stage" style="left: 80%;" id="stage-failed">
+    <div class="stage-name">Failed</div>
+    <div class="stage-count" id="count-failed">0</div>
+    <div class="stage-percent" id="percent-failed">0%</div>
+  </div>
+</div>
+
+<div id="hamming-display">
+  <div style="font-size: 11px; color: #ff00ff;">HAMMING DISTANCE COMPARISON</div>
+  <div id="hamming-grid" class="hamming-grid"></div>
+  <div style="font-size: 9px; color: #666; margin-top: 5px;">
+    Min Distance: <span id="min-hamming" style="color: #00ff00;">-</span> | 
+    Avg: <span id="avg-hamming" style="color: #00ffff;">-</span>
+  </div>
+</div>
+
+<div id="enrichment-chart">
+  <div style="font-size: 11px; color: #ff00ff;">ENRICHMENT LEVELS (Z-SCORE)</div>
+  <div id="enrichment-bars" style="margin-top: 10px;"></div>
+</div>
+
+<div id="progress-bar">
+  <div class="progress-fill" id="progress-fill" style="width: 0%;">
+    <div class="progress-text" id="progress-text">0 / 7,071,847</div>
+  </div>
+</div>
+
+<div id="barcode-matrix"></div>
+
+<div id="speed-control">
+  <span class="speed-label">Speed:</span>
+  <input type="range" id="speed-slider" min="1" max="1000" value="100">
+  <span id="speed-value">100x</span>
+  <span id="status-text" style="margin-left: 20px; font-size: 10px; color: #ffff00;">Connecting...</span>
+</div>
+
+<script>
+// WebSocket connection
+let ws = null;
+let speedMultiplier = 100;
+
+// Data storage - EXACT from server
+let totalSequences = 7071847;
+let processedCount = 0;
+let stageCounts = {
+  loading: 0,
+  quality_control: 0,
+  error_correction: 0,
+  clustering: 0,
+  failed: 0
+};
+
+let barcodeDistribution = {};
+let lastBarcodes = [];
+let enrichmentHistory = [];
+
+// Connect to EXACT data server
+function connect() {
+  ws = new WebSocket('ws://localhost:8766');
+  
+  ws.onopen = () => {
+    console.log('Connected to EXACT data stream');
+    document.getElementById('total-seq').style.color = '#00ff00';
+    document.getElementById('status-text').textContent = 'CONNECTED - Streaming Real Data';
+    document.getElementById('status-text').style.color = '#00ff00';
+  };
+  
+  ws.onmessage = (event) => {
+    const message = JSON.parse(event.data);
+    handleExactData(message);
+  };
+  
+  ws.onclose = () => {
+    document.getElementById('total-seq').style.color = '#ff0000';
+    document.getElementById('status-text').textContent = 'DISCONNECTED - Reconnecting...';
+    document.getElementById('status-text').style.color = '#ff0000';
+    setTimeout(connect, 2000);
+  };
+  
+  ws.onerror = (error) => {
+    console.error('WebSocket error:', error);
+    document.getElementById('status-text').textContent = 'CONNECTION ERROR';
+    document.getElementById('status-text').style.color = '#ff0000';
+  };
+}
+
+function handleExactData(message) {
+  switch(message.type) {
+    case 'init':
+      // Initialize with EXACT data
+      totalSequences = message.data.total_sequences;
+      document.getElementById('total-seq').textContent = totalSequences.toLocaleString();
+      document.getElementById('unique').textContent = message.data.unique_barcodes.toLocaleString();
+      barcodeDistribution = message.data.barcode_distribution;
+      break;
+      
+    case 'sequence':
+      // Process EXACT sequence data
+      processExactSequence(message.data);
+      break;
+      
+    case 'metrics':
+      // Update with EXACT metrics
+      updateExactMetrics(message.data);
+      break;
+      
+    case 'progress':
+      // Update EXACT progress
+      updateProgress(message.data);
+      break;
+  }
+}
+
+function processExactSequence(data) {
+  // Update stage display
+  const stageMap = {
+    'loading': 'loading',
+    'quality_control': 'qc',
+    'error_correction': 'error',
+    'clustering': 'cluster',
+    'failed': 'failed'
+  };
+  
+  const displayStage = stageMap[data.stage];
+  if (displayStage) {
+    // Flash stage
+    const stageEl = document.getElementById(`stage-${displayStage}`);
+    stageEl.classList.add('active');
+    setTimeout(() => stageEl.classList.remove('active'), 100);
+    
+    // Update count
+    if (stageCounts[data.stage] !== undefined) {
+      stageCounts[data.stage]++;
+      document.getElementById(`count-${displayStage}`).textContent = 
+        stageCounts[data.stage].toLocaleString();
+    }
+  }
+  
+  // Display sequence
+  if (data.stage === 'loading' || data.stage === 'clustering' || data.stage === 'failed') {
+    displaySequence(data);
+  }
+  
+  // Update barcode matrix with EXACT base composition
+  if (data.base_composition) {
+    updateBarcodeMatrix(data.barcode, data.base_composition);
+  }
+  
+  // Update Hamming display with EXACT distances
+  if (data.min_hamming !== undefined) {
+    document.getElementById('min-hamming').textContent = data.min_hamming;
+    document.getElementById('avg-hamming').textContent = data.avg_hamming.toFixed(1);
+    
+    if (data.barcode && lastBarcodes.length > 0) {
+      displayHammingComparison(data.barcode, lastBarcodes[0]);
+    }
+  }
+  
+  // Update enrichment chart with EXACT Z-scores
+  if (data.z_score !== undefined) {
+    enrichmentHistory.push(data.z_score);
+    if (enrichmentHistory.length > 50) enrichmentHistory.shift();
+    updateEnrichmentChart();
+  }
+  
+  // Track enriched barcodes
+  if (data.enriched) {
+    document.getElementById('enriched').textContent = 
+      (parseInt(document.getElementById('enriched').textContent) + 1).toLocaleString();
+  }
+  
+  // Keep last few barcodes for comparison
+  if (data.barcode) {
+    lastBarcodes.unshift(data.barcode);
+    if (lastBarcodes.length > 5) lastBarcodes.pop();
+  }
+}
+
+function displaySequence(data) {
+  const list = document.getElementById('seq-list');
+  const entry = document.createElement('div');
+  entry.className = 'seq-entry';
+  
+  if (data.stage === 'failed') {
+    entry.innerHTML = `
+      <span class="seq-id">${data.id}</span>
+      <span class="seq-failed">NO BARCODE</span>
+    `;
+  } else if (data.enriched) {
+    entry.innerHTML = `
+      <span class="seq-id">${data.id}</span>
+      <span class="seq-barcode seq-enriched">${data.barcode}</span>
+      <span style="color: #ff00ff;"> Z=${data.z_score.toFixed(2)} Count=${data.count}</span>
+    `;
+  } else if (data.barcode) {
+    entry.innerHTML = `
+      <span class="seq-id">${data.id}</span>
+      <span class="seq-barcode">${colorBarcode(data.barcode)}</span>
+    `;
+  }
+  
+  list.insertBefore(entry, list.firstChild);
+  while (list.children.length > 20) {
+    list.removeChild(list.lastChild);
+  }
+}
+
+function colorBarcode(barcode) {
+  return barcode.split('').map(base => {
+    const color = base === 'A' ? '#ff0000' :
+                 base === 'T' ? '#0000ff' :
+                 base === 'G' ? '#ffff00' : '#00ff00';
+    return `<span style="color: ${color}">${base}</span>`;
+  }).join('');
+}
+
+function updateBarcodeMatrix(barcode, composition) {
+  const matrix = document.getElementById('barcode-matrix');
+  
+  const row = document.createElement('div');
+  row.className = 'matrix-row';
+  
+  for (let base of barcode) {
+    const cell = document.createElement('div');
+    cell.className = `matrix-cell base-${base}`;
+    cell.style.opacity = 0.5 + Math.random() * 0.5;
+    row.appendChild(cell);
+  }
+  
+  matrix.insertBefore(row, matrix.firstChild);
+  while (matrix.children.length > 15) {
+    matrix.removeChild(matrix.lastChild);
+  }
+}
+
+function displayHammingComparison(barcode1, barcode2) {
+  const grid = document.getElementById('hamming-grid');
+  grid.innerHTML = '';
+  
+  if (barcode1.length === barcode2.length) {
+    for (let i = 0; i < barcode1.length; i++) {
+      const cell = document.createElement('div');
+      cell.className = 'hamming-cell';
+      
+      if (barcode1[i] === barcode2[i]) {
+        cell.className += ' hamming-match';
+        cell.textContent = barcode1[i];
+      } else {
+        cell.className += ' hamming-mismatch';
+        cell.textContent = barcode1[i];
+      }
+      
+      grid.appendChild(cell);
+    }
+  }
+}
+
+function updateEnrichmentChart() {
+  const container = document.getElementById('enrichment-bars');
+  container.innerHTML = '';
+  
+  const maxZ = Math.max(...enrichmentHistory, 1);
+  
+  enrichmentHistory.forEach(zscore => {
+    const bar = document.createElement('div');
+    bar.className = 'enrichment-bar';
+    bar.style.height = (Math.abs(zscore) / maxZ * 60) + 'px';
+    bar.style.background = zscore > 4 ? '#ff00ff' : 
+                          zscore > 2 ? '#ff0088' : 
+                          zscore > 0 ? '#8800ff' : '#0088ff';
+    container.appendChild(bar);
+  });
+}
+
+function updateExactMetrics(metrics) {
+  document.getElementById('processed').textContent = metrics.processed.toLocaleString();
+  document.getElementById('success-rate').textContent = metrics.success_rate.toFixed(1) + '%';
+  document.getElementById('position').textContent = metrics.current_position.toLocaleString();
+  document.getElementById('coverage').textContent = metrics.exact_mean_coverage.toFixed(1);
+  
+  // Update percentages
+  Object.keys(stageCounts).forEach(stage => {
+    const percent = (stageCounts[stage] / Math.max(metrics.processed, 1) * 100).toFixed(1);
+    const displayStage = stage.replace('quality_control', 'qc')
+                              .replace('error_correction', 'error')
+                              .replace('clustering', 'cluster');
+    const el = document.getElementById(`percent-${displayStage}`);
+    if (el) el.textContent = percent + '%';
+  });
+}
+
+function updateProgress(data) {
+  const fill = document.getElementById('progress-fill');
+  const text = document.getElementById('progress-text');
+  
+  fill.style.width = data.percentage + '%';
+  text.textContent = `${data.processed.toLocaleString()} / ${data.total.toLocaleString()}`;
+}
+
+// Speed control
+document.getElementById('speed-slider').addEventListener('input', (e) => {
+  speedMultiplier = parseInt(e.target.value);
+  document.getElementById('speed-value').textContent = speedMultiplier + 'x';
+  
+  // Send speed update to server if needed
+  if (ws && ws.readyState === WebSocket.OPEN) {
+    ws.send(JSON.stringify({
+      type: 'speed',
+      value: speedMultiplier
+    }));
+  }
+});
+
+// Debug info
+console.log('Starting connection to ws://localhost:8766');
+
+// Start connection
+connect();
+
+// Add connection status check
+setInterval(() => {
+  if (ws) {
+    const state = ['CONNECTING', 'OPEN', 'CLOSING', 'CLOSED'][ws.readyState];
+    console.log('WebSocket state:', state);
+    if (ws.readyState === WebSocket.CLOSED) {
+      console.log('Reconnecting...');
+      connect();
+    }
+  }
+}, 5000);
+</script>
+</body>
+</html>

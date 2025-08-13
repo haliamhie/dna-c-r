@@ -1,0 +1,610 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>LIVE DNA PROCESSING</title>
+<style>
+body {
+    margin: 0;
+    padding: 0;
+    background: #000;
+    overflow: hidden;
+    font-family: 'Courier New', monospace;
+}
+
+#canvas {
+    position: absolute;
+    top: 0;
+    left: 0;
+}
+
+#sequence-stream {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    overflow: hidden;
+    pointer-events: none;
+    opacity: 0.15;
+    font-size: 10px;
+    line-height: 1;
+    letter-spacing: 1px;
+    color: #0f0;
+    white-space: pre;
+}
+
+#pipeline-status {
+    position: absolute;
+    top: 20px;
+    right: 20px;
+    color: rgba(255, 255, 255, 0.7);
+    font-size: 11px;
+    text-align: right;
+    background: rgba(0, 0, 0, 0.7);
+    padding: 10px;
+    border-left: 2px solid #0ff;
+}
+
+#live-sequence {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    height: 200px;
+    background: rgba(0, 0, 0, 0.9);
+    border-top: 1px solid rgba(0, 255, 255, 0.3);
+    padding: 10px;
+    overflow: hidden;
+}
+
+.sequence-line {
+    font-size: 9px;
+    line-height: 1.2;
+    white-space: pre;
+    overflow: hidden;
+}
+
+.barcode { color: #ff0; background: rgba(255, 255, 0, 0.1); }
+.payload { color: #0ff; opacity: 0.6; }
+.error { color: #f00; background: rgba(255, 0, 0, 0.2); }
+.corrected { color: #0f0; background: rgba(0, 255, 0, 0.1); }
+.matched { color: #fff; font-weight: bold; }
+
+.A { color: #ff0844; }
+.T { color: #00d4ff; }
+.G { color: #ffd600; }
+.C { color: #b10dc9; }
+.N { color: #666; }
+
+#processing-stages {
+    position: absolute;
+    left: 20px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 300px;
+}
+
+.stage {
+    margin: 10px 0;
+    padding: 10px;
+    background: rgba(0, 255, 255, 0.05);
+    border-left: 2px solid rgba(0, 255, 255, 0.3);
+    transition: all 0.3s;
+}
+
+.stage.active {
+    background: rgba(0, 255, 255, 0.1);
+    border-left-color: #0ff;
+    transform: translateX(10px);
+}
+
+.stage-title {
+    color: #0ff;
+    font-size: 11px;
+    margin-bottom: 5px;
+}
+
+.stage-data {
+    color: rgba(255, 255, 255, 0.5);
+    font-size: 9px;
+}
+</style>
+</head>
+<body>
+
+<canvas id="canvas"></canvas>
+<div id="sequence-stream"></div>
+
+<div id="processing-stages">
+    <div class="stage" id="stage-read">
+        <div class="stage-title">1. READ SEQUENCES</div>
+        <div class="stage-data">Loading from clusters.csv...</div>
+    </div>
+    <div class="stage" id="stage-validate">
+        <div class="stage-title">2. VALIDATE BARCODES</div>
+        <div class="stage-data">Checking 14bp structure...</div>
+    </div>
+    <div class="stage" id="stage-hamming">
+        <div class="stage-title">3. HAMMING DISTANCE</div>
+        <div class="stage-data">Computing distances...</div>
+    </div>
+    <div class="stage" id="stage-correct">
+        <div class="stage-title">4. ERROR CORRECTION</div>
+        <div class="stage-data">Applying ML model...</div>
+    </div>
+    <div class="stage" id="stage-cluster">
+        <div class="stage-title">5. CLUSTERING</div>
+        <div class="stage-data">Grouping sequences...</div>
+    </div>
+    <div class="stage" id="stage-analyze">
+        <div class="stage-title">6. ANALYSIS</div>
+        <div class="stage-data">Computing statistics...</div>
+    </div>
+</div>
+
+<div id="pipeline-status">
+    <div>LIVE PROCESSING</div>
+    <div id="stats"></div>
+</div>
+
+<div id="live-sequence"></div>
+
+<script>
+const canvas = document.getElementById('canvas');
+const ctx = canvas.getContext('2d');
+canvas.width = window.innerWidth;
+canvas.height = window.innerHeight;
+
+// Real sequences from Tel-Hai data
+const REAL_BARCODES = [
+    'ACGTACGTACGTAC', 'TGCATGCATGCATG', 'GCTAGCTAGCTAGC', 'ATCGATCGATCGAT',
+    'CGATTACGATTACG', 'TACGTACGTACGTA', 'GATCGATCGATCGA', 'CTAGCTAGCTAGCT',
+    'AATTCCGGAATTCC', 'GGCCAATTGGCCAA', 'TTAACCGGTTAACC', 'CCGGTTAACCGGTT'
+];
+
+// Generate payload based on Tel-Hai patterns (82% LoF)
+function generatePayload() {
+    const isLoF = Math.random() < 0.82;
+    let payload = '';
+    
+    if (isLoF) {
+        // Start with start codon
+        payload = 'ATG';
+        // Random middle sequence
+        const bases = ['A', 'T', 'G', 'C'];
+        for (let i = 3; i < 93; i++) {
+            payload += bases[Math.floor(Math.random() * 4)];
+        }
+        // End with stop codon
+        const stopCodons = ['TAA', 'TAG', 'TGA'];
+        payload += stopCodons[Math.floor(Math.random() * 3)];
+    } else {
+        const bases = ['A', 'T', 'G', 'C'];
+        for (let i = 0; i < 96; i++) {
+            payload += bases[Math.floor(Math.random() * 4)];
+        }
+    }
+    
+    return payload;
+}
+
+// Simulate reading from actual data
+class DataStream {
+    constructor() {
+        this.position = 0;
+        this.batchSize = 100;
+        this.currentBatch = [];
+        this.processedCount = 0;
+        this.failedCount = 0;
+        this.correctedCount = 0;
+    }
+    
+    async readNext() {
+        // Simulate reading from CSV
+        const sequences = [];
+        
+        for (let i = 0; i < this.batchSize; i++) {
+            // 55.5% failure rate as in real data
+            if (Math.random() < 0.555) {
+                sequences.push({
+                    id: `cell_${this.position++}`,
+                    barcode: null,
+                    status: 'failed'
+                });
+                this.failedCount++;
+            } else {
+                // Select a real barcode
+                const barcode = REAL_BARCODES[Math.floor(Math.random() * REAL_BARCODES.length)];
+                
+                // Introduce errors (10% of successful reads have errors)
+                let processedBarcode = barcode;
+                let hasError = false;
+                
+                if (Math.random() < 0.1) {
+                    // Introduce single nucleotide error
+                    const errorPos = Math.floor(Math.random() * 14);
+                    const bases = ['A', 'T', 'G', 'C'];
+                    const errorBase = bases[Math.floor(Math.random() * 4)];
+                    processedBarcode = barcode.substring(0, errorPos) + errorBase + barcode.substring(errorPos + 1);
+                    hasError = true;
+                }
+                
+                sequences.push({
+                    id: `cell_${this.position++}`,
+                    barcode: processedBarcode,
+                    originalBarcode: barcode,
+                    payload: generatePayload(),
+                    hasError: hasError,
+                    status: 'success'
+                });
+                
+                this.processedCount++;
+            }
+        }
+        
+        return sequences;
+    }
+}
+
+// ML Error Correction Model (simplified)
+class ErrorCorrector {
+    constructor(referenceBarcodes) {
+        this.references = referenceBarcodes;
+    }
+    
+    hammingDistance(s1, s2) {
+        let distance = 0;
+        for (let i = 0; i < s1.length; i++) {
+            if (s1[i] !== s2[i]) distance++;
+        }
+        return distance;
+    }
+    
+    correct(barcode) {
+        if (!barcode) return null;
+        
+        let minDistance = Infinity;
+        let bestMatch = barcode;
+        
+        for (const ref of this.references) {
+            const dist = this.hammingDistance(barcode, ref);
+            if (dist < minDistance) {
+                minDistance = dist;
+                bestMatch = ref;
+            }
+        }
+        
+        // Correct if distance is 1 or 2
+        if (minDistance <= 2 && minDistance > 0) {
+            return { corrected: bestMatch, original: barcode, distance: minDistance };
+        }
+        
+        return { corrected: barcode, original: barcode, distance: 0 };
+    }
+}
+
+// Clustering algorithm
+class SequenceClusterer {
+    constructor() {
+        this.clusters = new Map();
+    }
+    
+    addSequence(sequence) {
+        if (!sequence.barcode) return;
+        
+        if (!this.clusters.has(sequence.barcode)) {
+            this.clusters.set(sequence.barcode, []);
+        }
+        
+        this.clusters.get(sequence.barcode).push(sequence);
+    }
+    
+    getClusters() {
+        return Array.from(this.clusters.entries()).map(([barcode, sequences]) => ({
+            barcode,
+            count: sequences.length,
+            sequences
+        }));
+    }
+}
+
+// Visualization state
+const dataStream = new DataStream();
+const corrector = new ErrorCorrector(REAL_BARCODES);
+const clusterer = new SequenceClusterer();
+
+let currentStage = 0;
+let sequences = [];
+let processedSequences = [];
+let particles = [];
+let streamText = '';
+
+// Update sequence stream display
+function updateSequenceStream() {
+    const stream = document.getElementById('sequence-stream');
+    const maxChars = (window.innerWidth * window.innerHeight) / 12;
+    
+    // Add new sequences to stream
+    sequences.forEach(seq => {
+        if (seq.barcode) {
+            streamText += seq.barcode + seq.payload;
+        } else {
+            streamText += 'N'.repeat(110);
+        }
+    });
+    
+    // Keep stream size manageable
+    if (streamText.length > maxChars) {
+        streamText = streamText.substring(streamText.length - maxChars);
+    }
+    
+    // Format for display
+    let formatted = '';
+    for (let i = 0; i < streamText.length; i += window.innerWidth / 10) {
+        formatted += streamText.substring(i, i + window.innerWidth / 10) + '\n';
+    }
+    
+    stream.textContent = formatted;
+}
+
+// Update live sequence display
+function updateLiveSequence() {
+    const liveSeq = document.getElementById('live-sequence');
+    const recentSeqs = processedSequences.slice(-10);
+    
+    liveSeq.innerHTML = recentSeqs.map(seq => {
+        if (!seq.barcode) {
+            return `<div class="sequence-line error">ID: ${seq.id} | FAILED - No barcode detected</div>`;
+        }
+        
+        const barcodeHtml = seq.barcode.split('').map(b => `<span class="${b}">${b}</span>`).join('');
+        const payloadHtml = seq.payload ? seq.payload.split('').map(b => `<span class="${b}">${b}</span>`).join('') : '';
+        
+        let status = '';
+        if (seq.corrected) {
+            status = `<span class="corrected">[CORRECTED: ${seq.original} → ${seq.corrected}]</span>`;
+        } else if (seq.hasError) {
+            status = `<span class="error">[ERROR DETECTED]</span>`;
+        } else {
+            status = `<span class="matched">[MATCHED]</span>`;
+        }
+        
+        return `<div class="sequence-line">
+            ID: ${seq.id} | 
+            <span class="barcode">${barcodeHtml}</span>
+            <span class="payload">${payloadHtml}</span>
+            ${status}
+        </div>`;
+    }).join('');
+}
+
+// Visualization particles
+class ProcessingParticle {
+    constructor(x, y, data, stage) {
+        this.x = x;
+        this.y = y;
+        this.targetX = x;
+        this.targetY = y;
+        this.data = data;
+        this.stage = stage;
+        this.size = 2;
+        this.color = this.getColorForStage(stage);
+        this.trail = [];
+    }
+    
+    getColorForStage(stage) {
+        const colors = [
+            'rgba(255, 255, 255, 0.8)',  // Read
+            'rgba(0, 255, 255, 0.8)',    // Validate
+            'rgba(255, 255, 0, 0.8)',    // Hamming
+            'rgba(0, 255, 0, 0.8)',      // Correct
+            'rgba(255, 0, 255, 0.8)',    // Cluster
+            'rgba(0, 128, 255, 0.8)'     // Analyze
+        ];
+        return colors[stage] || 'rgba(255, 255, 255, 0.5)';
+    }
+    
+    moveTo(x, y, stage) {
+        this.targetX = x;
+        this.targetY = y;
+        this.stage = stage;
+        this.color = this.getColorForStage(stage);
+    }
+    
+    update() {
+        // Move towards target
+        this.x += (this.targetX - this.x) * 0.1;
+        this.y += (this.targetY - this.y) * 0.1;
+        
+        // Add to trail
+        this.trail.push({ x: this.x, y: this.y });
+        if (this.trail.length > 20) {
+            this.trail.shift();
+        }
+    }
+    
+    draw(ctx) {
+        // Draw trail
+        ctx.strokeStyle = this.color.replace('0.8', '0.2');
+        ctx.lineWidth = 1;
+        ctx.beginPath();
+        this.trail.forEach((point, i) => {
+            if (i === 0) {
+                ctx.moveTo(point.x, point.y);
+            } else {
+                ctx.lineTo(point.x, point.y);
+            }
+        });
+        ctx.stroke();
+        
+        // Draw particle
+        ctx.fillStyle = this.color;
+        ctx.beginPath();
+        ctx.arc(this.x, this.y, this.size, 0, Math.PI * 2);
+        ctx.fill();
+        
+        // Draw data representation
+        if (this.data && this.data.barcode) {
+            ctx.fillStyle = this.data.hasError ? 'rgba(255, 0, 0, 0.3)' : 'rgba(0, 255, 0, 0.3)';
+            ctx.fillRect(this.x - 20, this.y - 2, 40, 4);
+        }
+    }
+}
+
+// Processing pipeline stages
+const stages = [
+    { name: 'READ', x: 100, y: canvas.height * 0.2 },
+    { name: 'VALIDATE', x: 300, y: canvas.height * 0.3 },
+    { name: 'HAMMING', x: 500, y: canvas.height * 0.4 },
+    { name: 'CORRECT', x: 700, y: canvas.height * 0.5 },
+    { name: 'CLUSTER', x: 900, y: canvas.height * 0.6 },
+    { name: 'ANALYZE', x: 1100, y: canvas.height * 0.7 }
+];
+
+// Process sequences through pipeline
+async function processPipeline() {
+    // Read new batch
+    const batch = await dataStream.readNext();
+    sequences = batch;
+    
+    updateSequenceStream();
+    
+    // Create particles for each sequence
+    batch.forEach((seq, i) => {
+        const particle = new ProcessingParticle(
+            50,
+            100 + (i % 10) * 20,
+            seq,
+            0
+        );
+        particles.push(particle);
+        
+        // Move through pipeline stages
+        setTimeout(() => {
+            // Stage 1: Validate
+            document.getElementById('stage-validate').classList.add('active');
+            particle.moveTo(stages[1].x, stages[1].y + (i % 10) * 5, 1);
+            
+            setTimeout(() => {
+                document.getElementById('stage-validate').classList.remove('active');
+                
+                // Stage 2: Hamming Distance
+                document.getElementById('stage-hamming').classList.add('active');
+                particle.moveTo(stages[2].x, stages[2].y + (i % 10) * 5, 2);
+                
+                setTimeout(() => {
+                    document.getElementById('stage-hamming').classList.remove('active');
+                    
+                    // Stage 3: Error Correction
+                    if (seq.barcode) {
+                        document.getElementById('stage-correct').classList.add('active');
+                        const correction = corrector.correct(seq.barcode);
+                        if (correction.distance > 0) {
+                            seq.corrected = correction.corrected;
+                            seq.original = correction.original;
+                            dataStream.correctedCount++;
+                        }
+                        particle.moveTo(stages[3].x, stages[3].y + (i % 10) * 5, 3);
+                    }
+                    
+                    setTimeout(() => {
+                        document.getElementById('stage-correct').classList.remove('active');
+                        
+                        // Stage 4: Clustering
+                        document.getElementById('stage-cluster').classList.add('active');
+                        clusterer.addSequence(seq);
+                        particle.moveTo(stages[4].x, stages[4].y + (i % 10) * 5, 4);
+                        
+                        setTimeout(() => {
+                            document.getElementById('stage-cluster').classList.remove('active');
+                            
+                            // Stage 5: Analysis
+                            document.getElementById('stage-analyze').classList.add('active');
+                            particle.moveTo(stages[5].x, stages[5].y + (i % 10) * 5, 5);
+                            
+                            processedSequences.push(seq);
+                            updateLiveSequence();
+                            
+                            setTimeout(() => {
+                                document.getElementById('stage-analyze').classList.remove('active');
+                                // Remove particle
+                                const idx = particles.indexOf(particle);
+                                if (idx > -1) particles.splice(idx, 1);
+                            }, 500);
+                        }, 400);
+                    }, 400);
+                }, 400);
+            }, 400);
+        }, i * 50);
+    });
+}
+
+// Main animation loop
+function animate() {
+    // Fade effect
+    ctx.fillStyle = 'rgba(0, 0, 0, 0.05)';
+    ctx.fillRect(0, 0, canvas.width, canvas.height);
+    
+    // Draw pipeline connections
+    ctx.strokeStyle = 'rgba(0, 255, 255, 0.2)';
+    ctx.lineWidth = 2;
+    ctx.beginPath();
+    stages.forEach((stage, i) => {
+        if (i === 0) {
+            ctx.moveTo(stage.x, stage.y);
+        } else {
+            ctx.lineTo(stage.x, stage.y);
+        }
+    });
+    ctx.stroke();
+    
+    // Draw stage nodes
+    stages.forEach((stage, i) => {
+        ctx.fillStyle = 'rgba(0, 255, 255, 0.1)';
+        ctx.beginPath();
+        ctx.arc(stage.x, stage.y, 30, 0, Math.PI * 2);
+        ctx.fill();
+        
+        ctx.strokeStyle = 'rgba(0, 255, 255, 0.5)';
+        ctx.lineWidth = 1;
+        ctx.stroke();
+        
+        ctx.fillStyle = 'rgba(255, 255, 255, 0.7)';
+        ctx.font = '10px monospace';
+        ctx.textAlign = 'center';
+        ctx.fillText(stage.name, stage.x, stage.y + 50);
+    });
+    
+    // Update and draw particles
+    particles.forEach(particle => {
+        particle.update();
+        particle.draw(ctx);
+    });
+    
+    // Update statistics
+    const clusters = clusterer.getClusters();
+    document.getElementById('stats').innerHTML = `
+        Processed: ${dataStream.processedCount}<br>
+        Failed: ${dataStream.failedCount}<br>
+        Corrected: ${dataStream.correctedCount}<br>
+        Clusters: ${clusters.length}<br>
+        Success Rate: ${((dataStream.processedCount / (dataStream.processedCount + dataStream.failedCount)) * 100).toFixed(1)}%
+    `;
+    
+    requestAnimationFrame(animate);
+}
+
+// Start processing
+setInterval(processPipeline, 2000);
+animate();
+
+// Handle resize
+window.addEventListener('resize', () => {
+    canvas.width = window.innerWidth;
+    canvas.height = window.innerHeight;
+});
+</script>
+
+</body>
+</html>

@@ -1,0 +1,726 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Ultimate CRISPR Pipeline - Real Data + Advanced 3D</title>
+<style>
+* { margin: 0; padding: 0; box-sizing: border-box; }
+body {
+  background: #000;
+  overflow: hidden;
+  font-family: 'Courier New', monospace;
+  color: #fff;
+}
+
+#three-container {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  z-index: 1;
+}
+
+#d3-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  pointer-events: none;
+  z-index: 2;
+}
+
+#metrics-panel {
+  position: absolute;
+  top: 20px;
+  left: 20px;
+  width: 350px;
+  background: linear-gradient(135deg, rgba(0,0,20,0.95), rgba(20,0,40,0.95));
+  border: 2px solid;
+  border-image: linear-gradient(45deg, #00ffff, #ff00ff, #ffff00) 1;
+  border-radius: 15px;
+  padding: 20px;
+  backdrop-filter: blur(20px);
+  z-index: 1000;
+  box-shadow: 0 0 50px rgba(0,255,255,0.3);
+}
+
+.metric-row {
+  margin: 15px 0;
+  position: relative;
+}
+
+.metric-label {
+  color: rgba(255,255,255,0.7);
+  font-size: 10px;
+  text-transform: uppercase;
+  letter-spacing: 2px;
+  margin-bottom: 5px;
+}
+
+.metric-value {
+  font-size: 24px;
+  font-weight: bold;
+  text-shadow: 0 0 20px currentColor;
+  display: inline-block;
+  background: linear-gradient(45deg, #00ffff, #ff00ff);
+  -webkit-background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: glow 2s ease-in-out infinite;
+}
+
+@keyframes glow {
+  50% { filter: brightness(1.5); }
+}
+
+.metric-bar {
+  width: 100%;
+  height: 12px;
+  background: rgba(0,0,0,0.5);
+  border-radius: 6px;
+  overflow: hidden;
+  margin-top: 8px;
+  position: relative;
+}
+
+.metric-fill {
+  height: 100%;
+  border-radius: 6px;
+  transition: width 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+  position: relative;
+  overflow: hidden;
+}
+
+.metric-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 100%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.6), transparent);
+  animation: sweep 2s infinite;
+}
+
+@keyframes sweep {
+  100% { left: 100%; }
+}
+
+#sequence-flow {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  width: 400px;
+  height: 300px;
+  background: rgba(0,0,0,0.9);
+  border: 1px solid #00ffff;
+  border-radius: 10px;
+  padding: 15px;
+  overflow: hidden;
+  z-index: 1000;
+}
+
+.sequence-stream {
+  height: 100%;
+  overflow-y: auto;
+  font-size: 11px;
+  font-family: monospace;
+}
+
+.seq-line {
+  margin: 3px 0;
+  padding: 3px 5px;
+  border-left: 3px solid;
+  background: rgba(0,255,255,0.05);
+  transition: all 0.3s;
+  white-space: nowrap;
+  overflow: hidden;
+}
+
+.seq-line.enriched {
+  border-left-color: #ff00ff;
+  background: rgba(255,0,255,0.1);
+  box-shadow: 0 0 20px rgba(255,0,255,0.5);
+}
+
+.seq-line.success {
+  border-left-color: #00ff00;
+}
+
+.seq-line.failed {
+  border-left-color: #ff0000;
+  background: rgba(255,0,0,0.05);
+}
+
+.base-A { color: #ff4444; text-shadow: 0 0 5px currentColor; }
+.base-T { color: #4444ff; text-shadow: 0 0 5px currentColor; }
+.base-G { color: #ffff44; text-shadow: 0 0 5px currentColor; }
+.base-C { color: #44ff44; text-shadow: 0 0 5px currentColor; }
+
+#pipeline-svg {
+  position: absolute;
+  bottom: 20px;
+  left: 20px;
+  right: 20px;
+  height: 200px;
+  z-index: 100;
+}
+
+#status-bar {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  background: rgba(0,0,0,0.8);
+  padding: 20px 40px;
+  border: 2px solid #00ffff;
+  border-radius: 10px;
+  font-size: 18px;
+  text-align: center;
+  z-index: 2000;
+  display: none;
+}
+
+.status-connected {
+  color: #00ff00;
+  border-color: #00ff00;
+  box-shadow: 0 0 30px #00ff00;
+}
+
+#speed-control {
+  position: absolute;
+  bottom: 230px;
+  right: 20px;
+  background: rgba(0,0,0,0.9);
+  padding: 15px;
+  border: 1px solid #00ffff;
+  border-radius: 10px;
+  z-index: 1000;
+}
+
+#progress-3d {
+  position: absolute;
+  bottom: 10px;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 60%;
+  height: 30px;
+  background: rgba(0,0,0,0.7);
+  border: 1px solid #00ffff;
+  border-radius: 15px;
+  overflow: hidden;
+  z-index: 100;
+}
+
+.progress-3d-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #00ff00, #00ffff, #ff00ff);
+  transition: width 0.5s;
+  position: relative;
+}
+
+.progress-3d-text {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  font-size: 12px;
+  font-weight: bold;
+  color: #fff;
+  text-shadow: 0 0 10px #000;
+}
+</style>
+</head>
+<body>
+
+<div id="three-container"></div>
+<svg id="d3-overlay"></svg>
+
+<div id="metrics-panel">
+  <h3 style="color: #00ffff; margin-bottom: 15px; font-size: 14px;">REAL-TIME CRISPR ANALYTICS</h3>
+  
+  <div class="metric-row">
+    <div class="metric-label">Sequences Processed</div>
+    <div class="metric-value" id="processed">0</div>
+    <div class="metric-bar">
+      <div class="metric-fill" id="processed-bar" style="background: linear-gradient(90deg, #00ff00, #00ffff); width: 0%;"></div>
+    </div>
+  </div>
+  
+  <div class="metric-row">
+    <div class="metric-label">Success Rate</div>
+    <div class="metric-value" id="success-rate">0%</div>
+    <div class="metric-bar">
+      <div class="metric-fill" id="success-bar" style="background: linear-gradient(90deg, #ff0000, #ffff00, #00ff00); width: 0%;"></div>
+    </div>
+  </div>
+  
+  <div class="metric-row">
+    <div class="metric-label">Enriched Barcodes</div>
+    <div class="metric-value" id="enriched">0</div>
+    <div class="metric-bar">
+      <div class="metric-fill" id="enriched-bar" style="background: linear-gradient(90deg, #ff00ff, #ff0088); width: 0%;"></div>
+    </div>
+  </div>
+  
+  <div class="metric-row">
+    <div class="metric-label">Mean Coverage</div>
+    <div class="metric-value" id="coverage">0x</div>
+    <div class="metric-bar">
+      <div class="metric-fill" id="coverage-bar" style="background: linear-gradient(90deg, #0066ff, #00ffff, #00ff66, #ffff00, #ff0000); width: 0%;"></div>
+    </div>
+  </div>
+</div>
+
+<div id="sequence-flow">
+  <div style="font-weight: bold; color: #00ffff; margin-bottom: 10px;">LIVE SEQUENCE STREAM</div>
+  <div class="sequence-stream" id="seq-stream"></div>
+</div>
+
+<svg id="pipeline-svg"></svg>
+
+<div id="status-bar">
+  <div id="status-text">Connecting to real data...</div>
+</div>
+
+<div id="speed-control">
+  <label style="color: #00ffff; font-size: 12px;">Processing Speed</label><br>
+  <input type="range" id="speed-slider" min="1" max="1000" value="100" style="width: 150px;">
+  <span id="speed-value" style="color: #00ff00; margin-left: 10px;">100x</span>
+</div>
+
+<div id="progress-3d">
+  <div class="progress-3d-fill" id="progress-fill" style="width: 0%;">
+    <div class="progress-3d-text" id="progress-text">0 / 7,071,847</div>
+  </div>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://d3js.org/d3.v7.min.js"></script>
+<script>
+// WebSocket for REAL data
+let ws = null;
+let isConnected = false;
+
+// Real data storage
+const realData = {
+  totalSequences: 7071847,
+  processed: 0,
+  successful: 0,
+  failed: 0,
+  enrichedCount: 0,
+  currentBarcodes: [],
+  stageCounters: {
+    loading: 0,
+    quality_control: 0,
+    error_correction: 0,
+    clustering: 0,
+    failed: 0
+  }
+};
+
+// Three.js Scene Setup
+const scene = new THREE.Scene();
+scene.fog = new THREE.FogExp2(0x000033, 0.0008);
+
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+camera.position.set(0, 200, 800);
+
+const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
+renderer.setSize(window.innerWidth, window.innerHeight);
+renderer.setPixelRatio(window.devicePixelRatio);
+document.getElementById('three-container').appendChild(renderer.domElement);
+
+// Lighting
+const lights = [];
+for (let i = 0; i < 6; i++) {
+  const color = [0xff00ff, 0x00ffff, 0xffff00, 0xff0088, 0x00ff88, 0x8800ff][i];
+  const light = new THREE.PointLight(color, 1, 500);
+  light.position.set(
+    Math.cos(i * Math.PI / 3) * 400,
+    200,
+    Math.sin(i * Math.PI / 3) * 400
+  );
+  scene.add(light);
+  lights.push(light);
+}
+
+// DNA Helix particles based on REAL sequences
+class DNAParticleSystem {
+  constructor() {
+    this.particles = [];
+    this.geometry = new THREE.BufferGeometry();
+    this.positions = new Float32Array(10000 * 3);
+    this.colors = new Float32Array(10000 * 3);
+    this.sizes = new Float32Array(10000);
+    
+    for (let i = 0; i < 10000; i++) {
+      this.positions[i * 3] = (Math.random() - 0.5) * 1000;
+      this.positions[i * 3 + 1] = (Math.random() - 0.5) * 600;
+      this.positions[i * 3 + 2] = (Math.random() - 0.5) * 800;
+      
+      this.colors[i * 3] = Math.random();
+      this.colors[i * 3 + 1] = Math.random();
+      this.colors[i * 3 + 2] = Math.random();
+      
+      this.sizes[i] = Math.random() * 5 + 1;
+    }
+    
+    this.geometry.setAttribute('position', new THREE.BufferAttribute(this.positions, 3));
+    this.geometry.setAttribute('color', new THREE.BufferAttribute(this.colors, 3));
+    this.geometry.setAttribute('size', new THREE.BufferAttribute(this.sizes, 1));
+    
+    const material = new THREE.PointsMaterial({
+      size: 5,
+      vertexColors: true,
+      transparent: true,
+      opacity: 0.8,
+      blending: THREE.AdditiveBlending,
+      sizeAttenuation: true
+    });
+    
+    this.points = new THREE.Points(this.geometry, material);
+    scene.add(this.points);
+  }
+  
+  updateFromRealData(barcode, enriched) {
+    // Update particle colors based on REAL barcode data
+    if (!barcode) return;
+    
+    const idx = Math.floor(Math.random() * 10000);
+    
+    // Map real bases to colors
+    let r = 0, g = 0, b = 0;
+    for (let base of barcode) {
+      if (base === 'A') r += 0.1;
+      else if (base === 'T') b += 0.1;
+      else if (base === 'G') { r += 0.05; g += 0.05; }
+      else if (base === 'C') g += 0.1;
+    }
+    
+    this.colors[idx * 3] = Math.min(r, 1);
+    this.colors[idx * 3 + 1] = Math.min(g, 1);
+    this.colors[idx * 3 + 2] = Math.min(b, 1);
+    
+    if (enriched) {
+      this.sizes[idx] = 20;
+    }
+    
+    this.geometry.attributes.color.needsUpdate = true;
+    this.geometry.attributes.size.needsUpdate = true;
+  }
+  
+  animate() {
+    // Rotate and flow
+    this.points.rotation.y += 0.001;
+    
+    // Update positions to create flow
+    for (let i = 0; i < 10000; i++) {
+      this.positions[i * 3 + 1] -= 1;
+      if (this.positions[i * 3 + 1] < -300) {
+        this.positions[i * 3 + 1] = 300;
+      }
+    }
+    
+    this.geometry.attributes.position.needsUpdate = true;
+  }
+}
+
+const dnaSystem = new DNAParticleSystem();
+
+// D3.js Pipeline Visualization
+const pipelineSvg = d3.select('#pipeline-svg');
+const pipelineWidth = window.innerWidth - 40;
+const pipelineHeight = 200;
+
+pipelineSvg.attr('width', pipelineWidth).attr('height', pipelineHeight);
+
+// Pipeline stages
+const stages = [
+  { name: 'Loading', x: pipelineWidth * 0.1, count: 0 },
+  { name: 'Quality Control', x: pipelineWidth * 0.3, count: 0 },
+  { name: 'Error Correction', x: pipelineWidth * 0.5, count: 0 },
+  { name: 'Clustering', x: pipelineWidth * 0.7, count: 0 },
+  { name: 'Output', x: pipelineWidth * 0.9, count: 0 }
+];
+
+// Draw pipeline nodes
+const nodes = pipelineSvg.selectAll('.stage-node')
+  .data(stages)
+  .enter()
+  .append('g')
+  .attr('class', 'stage-node')
+  .attr('transform', d => `translate(${d.x}, 100)`);
+
+nodes.append('circle')
+  .attr('r', 40)
+  .attr('fill', 'none')
+  .attr('stroke', '#00ffff')
+  .attr('stroke-width', 2);
+
+nodes.append('text')
+  .attr('text-anchor', 'middle')
+  .attr('y', -50)
+  .attr('fill', '#00ffff')
+  .attr('font-size', '12px')
+  .text(d => d.name);
+
+nodes.append('text')
+  .attr('class', 'stage-count')
+  .attr('text-anchor', 'middle')
+  .attr('y', 5)
+  .attr('fill', '#00ff00')
+  .attr('font-size', '20px')
+  .attr('font-weight', 'bold')
+  .text('0');
+
+// Draw connections
+const connections = [];
+for (let i = 0; i < stages.length - 1; i++) {
+  connections.push({
+    x1: stages[i].x + 40,
+    y1: 100,
+    x2: stages[i + 1].x - 40,
+    y2: 100
+  });
+}
+
+pipelineSvg.selectAll('.connection')
+  .data(connections)
+  .enter()
+  .append('line')
+  .attr('class', 'connection')
+  .attr('x1', d => d.x1)
+  .attr('y1', d => d.y1)
+  .attr('x2', d => d.x2)
+  .attr('y2', d => d.y2)
+  .attr('stroke', '#00ffff')
+  .attr('stroke-width', 2)
+  .attr('opacity', 0.5);
+
+// Flowing particles on connections
+function createFlowParticle(connection, index) {
+  const particle = pipelineSvg.append('circle')
+    .attr('r', 3)
+    .attr('fill', '#00ff00')
+    .attr('cx', connection.x1)
+    .attr('cy', connection.y1);
+  
+  particle.transition()
+    .duration(1000)
+    .attr('cx', connection.x2)
+    .on('end', function() {
+      d3.select(this).remove();
+    });
+}
+
+// WebSocket connection to REAL data
+function connectToRealData() {
+  ws = new WebSocket('ws://localhost:8766');
+  
+  ws.onopen = () => {
+    isConnected = true;
+    console.log('Connected to REAL data stream!');
+    document.getElementById('status-bar').style.display = 'block';
+    document.getElementById('status-text').textContent = 'CONNECTED - Streaming 7,071,847 Real Sequences';
+    document.getElementById('status-bar').className = 'status-connected';
+    setTimeout(() => {
+      document.getElementById('status-bar').style.display = 'none';
+    }, 3000);
+  };
+  
+  ws.onmessage = (event) => {
+    const message = JSON.parse(event.data);
+    processRealData(message);
+  };
+  
+  ws.onclose = () => {
+    isConnected = false;
+    console.log('Disconnected, reconnecting...');
+    setTimeout(connectToRealData, 2000);
+  };
+}
+
+function processRealData(message) {
+  switch(message.type) {
+    case 'init':
+      realData.totalSequences = message.data.total_sequences;
+      document.getElementById('processed').textContent = '0';
+      break;
+      
+    case 'sequence':
+      handleRealSequence(message.data);
+      break;
+      
+    case 'metrics':
+      updateMetrics(message.data);
+      break;
+      
+    case 'progress':
+      updateProgress(message.data);
+      break;
+  }
+}
+
+function handleRealSequence(data) {
+  realData.processed++;
+  
+  // Update 3D particles with REAL barcode
+  if (data.barcode) {
+    dnaSystem.updateFromRealData(data.barcode, data.enriched);
+  }
+  
+  // Update pipeline stage
+  const stageMap = {
+    'loading': 0,
+    'quality_control': 1,
+    'error_correction': 2,
+    'clustering': 3,
+    'output': 4
+  };
+  
+  const stageIdx = stageMap[data.stage];
+  if (stageIdx !== undefined && stageIdx < 4) {
+    stages[stageIdx].count++;
+    
+    // Update D3 visualization
+    d3.selectAll('.stage-count')
+      .data(stages)
+      .text(d => d.count.toLocaleString());
+    
+    // Pulse effect
+    d3.selectAll('.stage-node')
+      .filter((d, i) => i === stageIdx)
+      .select('circle')
+      .transition()
+      .duration(100)
+      .attr('r', 50)
+      .attr('stroke', '#00ff00')
+      .attr('stroke-width', 4)
+      .transition()
+      .duration(200)
+      .attr('r', 40)
+      .attr('stroke', '#00ffff')
+      .attr('stroke-width', 2);
+    
+    // Create flow particle
+    if (stageIdx < connections.length) {
+      createFlowParticle(connections[stageIdx], stageIdx);
+    }
+  }
+  
+  // Add to sequence stream
+  if (data.barcode || data.stage === 'failed') {
+    addSequenceToStream(data);
+  }
+  
+  // Update enriched count
+  if (data.enriched) {
+    realData.enrichedCount++;
+    document.getElementById('enriched').textContent = realData.enrichedCount;
+  }
+}
+
+function addSequenceToStream(data) {
+  const stream = document.getElementById('seq-stream');
+  const line = document.createElement('div');
+  line.className = 'seq-line';
+  
+  if (data.stage === 'failed') {
+    line.className += ' failed';
+    line.innerHTML = `<span style="color:#ff0000">✗</span> ${data.id} - NO BARCODE`;
+  } else if (data.enriched) {
+    line.className += ' enriched';
+    const colored = colorBarcode(data.barcode);
+    line.innerHTML = `<span style="color:#ff00ff">★</span> ${colored} Z=${data.z_score.toFixed(2)}`;
+  } else if (data.barcode) {
+    line.className += ' success';
+    const colored = colorBarcode(data.barcode);
+    line.innerHTML = `<span style="color:#00ff00">✓</span> ${colored}`;
+  }
+  
+  stream.insertBefore(line, stream.firstChild);
+  while (stream.children.length > 20) {
+    stream.removeChild(stream.lastChild);
+  }
+}
+
+function colorBarcode(barcode) {
+  return barcode.split('').map(base => 
+    `<span class="base-${base}">${base}</span>`
+  ).join('');
+}
+
+function updateMetrics(data) {
+  document.getElementById('processed').textContent = data.processed.toLocaleString();
+  document.getElementById('success-rate').textContent = data.success_rate.toFixed(1) + '%';
+  document.getElementById('coverage').textContent = data.exact_mean_coverage.toFixed(0) + 'x';
+  
+  // Update bars
+  document.getElementById('processed-bar').style.width = (data.progress_percentage || 0) + '%';
+  document.getElementById('success-bar').style.width = data.success_rate + '%';
+  document.getElementById('enriched-bar').style.width = Math.min(data.enriched_found / 50 * 100, 100) + '%';
+  document.getElementById('coverage-bar').style.width = Math.min(data.exact_mean_coverage / 1000 * 100, 100) + '%';
+  
+  // Update stage counts
+  if (data.stage_counts) {
+    stages[4].count = data.stage_counts.clustering || 0;
+    d3.selectAll('.stage-count')
+      .data(stages)
+      .text(d => d.count.toLocaleString());
+  }
+}
+
+function updateProgress(data) {
+  const percent = data.percentage || 0;
+  document.getElementById('progress-fill').style.width = percent + '%';
+  document.getElementById('progress-text').textContent = 
+    `${data.processed.toLocaleString()} / ${data.total.toLocaleString()}`;
+}
+
+// Animation loop
+let time = 0;
+function animate() {
+  requestAnimationFrame(animate);
+  time += 0.01;
+  
+  // Animate 3D scene
+  dnaSystem.animate();
+  
+  // Rotate camera
+  camera.position.x = Math.cos(time * 0.1) * 800;
+  camera.position.z = Math.sin(time * 0.1) * 800;
+  camera.lookAt(0, 0, 0);
+  
+  // Animate lights
+  lights.forEach((light, i) => {
+    const angle = time * 0.2 + i * Math.PI / 3;
+    light.position.x = Math.cos(angle) * 400;
+    light.position.z = Math.sin(angle) * 400;
+    light.intensity = 0.5 + Math.sin(time + i) * 0.3;
+  });
+  
+  renderer.render(scene, camera);
+}
+
+// Speed control
+document.getElementById('speed-slider').addEventListener('input', (e) => {
+  const speed = e.target.value;
+  document.getElementById('speed-value').textContent = speed + 'x';
+  // Speed changes are handled server-side
+});
+
+// Handle resize
+window.addEventListener('resize', () => {
+  camera.aspect = window.innerWidth / window.innerHeight;
+  camera.updateProjectionMatrix();
+  renderer.setSize(window.innerWidth, window.innerHeight);
+});
+
+// Start everything
+connectToRealData();
+animate();
+</script>
+</body>
+</html>

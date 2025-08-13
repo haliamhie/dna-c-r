@@ -1,0 +1,319 @@
+{
+  "data_summary": {
+    "total_reads": 7071847,
+    "unique_cells": 7071847,
+    "unique_barcodes": 10000,
+    "reads_with_barcodes": 3149475,
+    "failed_reads": 3922372,
+    "failure_rate": 0.5546460493277074
+  },
+  "quality_control": {
+    "summary": {
+      "total_reads": 7071847,
+      "valid_barcodes": "4542",
+      "failed_barcodes": "5458",
+      "failure_rate": 0.5546460493277074,
+      "matches_expected_failure": "True"
+    },
+    "failure_diagnosis": {
+      "synthesis_errors": 0,
+      "pcr_amplification_bias": 0.17217084984588288,
+      "insufficient_phix": 0,
+      "contamination": 0,
+      "rna_degradation": 0.1,
+      "cell_segmentation_errors": 0.05,
+      "low_complexity_regions": 0,
+      "adapter_dimers": 0
+    },
+    "coverage_statistics": {
+      "mean_coverage": 1.2567791920309905,
+      "median_coverage": 1.0,
+      "std_coverage": 0.5311828354743894,
+      "cv_coverage": 0.422654065919076,
+      "min_coverage": 1,
+      "max_coverage": 5,
+      "zero_coverage_barcodes": 0,
+      "low_coverage_barcodes": 3614,
+      "high_coverage_barcodes": 0,
+      "gini_coefficient": 0.16617588969166097,
+      "sufficient_for_statistics": "False",
+      "matches_ops_pattern": "False"
+    },
+    "contamination_check": {
+      "unexpected_barcodes": 0,
+      "contamination_rate": 0.0,
+      "potential_sources": [],
+      "adapter_contamination": 0,
+      "primer_contamination": 0
+    },
+    "recommendations": []
+  },
+  "clustering": {
+    "phenotype_clusters": {
+      "enriched_barcodes": {
+        "GTCTTTCTGCTCGT": {
+          "count": 899,
+          "z_score": 8.110012070774607,
+          "fold_change": 1.8941309331175835
+        },
+        "GGCGCTTCATGGTC": {
+          "count": 861,
+          "z_score": 7.383815352087795,
+          "fold_change": 1.814067556634304
+        },
+        "GGAATCGTATCCGT": {
+          "count": 797,
+          "z_score": 6.160747194299477,
+          "fold_change": 1.679223975188781
+        },
+        "TGCCGTCCGCGCTC": {
+          "count": 730,
+          "z_score": 4.880347716614833,
+          "fold_change": 1.5380596008629988
+        },
+        "ACGTCTTTGTCCCG": {
+          "count": 704,
+          "z_score": 4.383476277513329,
+          "fold_change": 1.483279395900755
+        },
+        "CAGTCATCCCGCGT": {
+          "count": 701,
+          "z_score": 4.326144957617001,
+          "fold_change": 1.4769586030204962
+        },
+        "CTGCCTGTTCGATC": {
+          "count": 677,
+          "z_score": 3.8674943984463823,
+          "fold_change": 1.426392259978425
+        },
+        "GACATAGGGGGCCC": {
+          "count": 675,
+          "z_score": 3.8292735185154974,
+          "fold_change": 1.4221783980582523
+        },
+        "TCCGTCTTCTAAAT": {
+          "count": 671,
+          "z_score": 3.7528317586537274,
+          "fold_change": 1.4137506742179071
+        },
+        "CCTTTACCCCAGGT": {
+          "count": 656,
+          "z_score": 3.4661751591720904,
+          "fold_change": 1.3821467098166127
+        },
+        "TCAGGTGGTTTATC": {
+          "count": 646,
+          "z_score": 3.275070759517666,
+          "fold_change": 1.3610774002157497
+        },
+        "TCAGAAGTCCCTTA": {
+          "count": 646,
+          "z_score": 3.275070759517666,
+          "fold_change": 1.3610774002157497
+        },
+        "GGTTACAGCGATTA": {
+          "count": 646,
+          "z_score": 3.275070759517666,
+          "fold_change": 1.3610774002157497
+        },
+        "TAGGAACGAGGTCC": {
+          "count": 643,
+          "z_score": 3.217739439621339,
+          "fold_change": 1.3547566073354909
+        },
+        "CGCTGAGTAGCCAT": {
+          "count": 640,
+          "z_score": 3.160408119725011,
+          "fold_change": 1.348435814455232
+        },
+        "ATGTTTTCCCAGCA": {
+          "count": 639,
+          "z_score": 3.141297679759569,
+          "fold_change": 1.3463288834951455
+        },
+        "TTTCGGCGCCGACT": {
+          "count": 637,
+          "z_score": 3.103076799828684,
+          "fold_change": 1.3421150215749729
+        },
+        "CGTCGATCTGAGTT": {
+          "count": 635,
+          "z_score": 3.064855919897799,
+          "fold_change": 1.3379011596548003
+        },
+        "TTAGCAAGGCCCTT": {
+          "count": 631,
+          "z_score": 2.988414160036029,
+          "fold_change": 1.329473435814455
+        },
+        "GCACCAGAAGCCAA": {
+          "count": 628,
+          "z_score": 2.9310828401397018,
+          "fold_change": 1.3231526429341962
+        },
+        "ACTACCTATTTGCT": {
+          "count": 626,
+          "z_score": 2.892861960208817,
+          "fold_change": 1.3189387810140236
+        },
+        "GACAAAGTTGTTGC": {
+          "count": 624,
+          "z_score": 2.854641080277932,
+          "fold_change": 1.314724919093851
+        },
+        "GCGCTCCGACTCAT": {
+          "count": 622,
+          "z_score": 2.816420200347047,
+          "fold_change": 1.3105110571736784
+        },
+        "GGTGCCCCTATGTG": {
+          "count": 618,
+          "z_score": 2.7399784404852774,
+          "fold_change": 1.3020833333333333
+        },
+        "CCGCTCATGATAGT": {
+          "count": 617,
+          "z_score": 2.7208680005198347,
+          "fold_change": 1.299976402373247
+        },
+        "CTCGGTAGGCCCTA": {
+          "count": 616,
+          "z_score": 2.7017575605543924,
+          "fold_change": 1.2978694714131607
+        },
+        "GCTTGGGACCCTCC": {
+          "count": 613,
+          "z_score": 2.6444262406580648,
+          "fold_change": 1.2915486785329018
+        },
+        "CGCATGGCTCCCAA": {
+          "count": 612,
+          "z_score": 2.6253158006926225,
+          "fold_change": 1.2894417475728155
+        },
+        "GGCGACGCGTCGGT": {
+          "count": 607,
+          "z_score": 2.5297636008654103,
+          "fold_change": 1.278907092772384
+        },
+        "GGGCGAACCGCTAG": {
+          "count": 606,
+          "z_score": 2.5106531608999676,
+          "fold_change": 1.2768001618122977
+        },
+        "TTGGCGCACTGAAT": {
+          "count": 606,
+          "z_score": 2.5106531608999676,
+          "fold_change": 1.2768001618122977
+        },
+        "CACCGGGAAGCTCA": {
+          "count": 606,
+          "z_score": 2.5106531608999676,
+          "fold_change": 1.2768001618122977
+        },
+        "AGGACACAAGGCCG": {
+          "count": 603,
+          "z_score": 2.4533218410036404,
+          "fold_change": 1.2704793689320388
+        },
+        "TTCTTCTCTACTCA": {
+          "count": 603,
+          "z_score": 2.4533218410036404,
+          "fold_change": 1.2704793689320388
+        },
+        "CCGACTCCCTGGAT": {
+          "count": 603,
+          "z_score": 2.4533218410036404,
+          "fold_change": 1.2704793689320388
+        },
+        "TATCGAAGGTCGCG": {
+          "count": 602,
+          "z_score": 2.434211401038198,
+          "fold_change": 1.2683724379719525
+        },
+        "CACGACCGCGCCGT": {
+          "count": 598,
+          "z_score": 2.357769641176428,
+          "fold_change": 1.2599447141316074
+        },
+        "ACTCGCGGCCCCAG": {
+          "count": 597,
+          "z_score": 2.3386592012109855,
+          "fold_change": 1.257837783171521
+        },
+        "AGGTAACTCGCCCG": {
+          "count": 596,
+          "z_score": 2.319548761245543,
+          "fold_change": 1.2557308522114348
+        },
+        "GCGTCAGGAAGCGT": {
+          "count": 595,
+          "z_score": 2.300438321280101,
+          "fold_change": 1.2536239212513485
+        },
+        "TATGCCGCACTCTT": {
+          "count": 592,
+          "z_score": 2.2431070013837733,
+          "fold_change": 1.2473031283710894
+        },
+        "CCGTTCCAACTACC": {
+          "count": 590,
+          "z_score": 2.2048861214528883,
+          "fold_change": 1.2430892664509168
+        },
+        "ATTGGTCCGCTCCG": {
+          "count": 588,
+          "z_score": 2.1666652415220033,
+          "fold_change": 1.2388754045307442
+        },
+        "TCGACGACAGTGAA": {
+          "count": 587,
+          "z_score": 2.147554801556561,
+          "fold_change": 1.236768473570658
+        },
+        "CACTGGTACCTTAA": {
+          "count": 583,
+          "z_score": 2.071113041694791,
+          "fold_change": 1.2283407497303127
+        },
+        "ATCTGCGCTCATTG": {
+          "count": 583,
+          "z_score": 2.071113041694791,
+          "fold_change": 1.2283407497303127
+        },
+        "AGCACGACCGTATC": {
+          "count": 582,
+          "z_score": 2.052002601729349,
+          "fold_change": 1.2262338187702264
+        },
+        "ACATCTGCGATCAT": {
+          "count": 580,
+          "z_score": 2.013781721798464,
+          "fold_change": 1.2220199568500538
+        },
+        "TCCGTTCCGACGTC": {
+          "count": 580,
+          "z_score": 2.013781721798464,
+          "fold_change": 1.2220199568500538
+        }
+      },
+      "depleted_barcodes": {},
+      "mean_barcode_count": 474.624,
+      "std_barcode_count": 52.32741903421936
+    },
+    "unique_cells": 7071847,
+    "unique_barcodes": 10000
+  },
+  "hit_candidates": [],
+  "crispr_analysis": {
+    "loss_of_function_rate": 0.7726,
+    "start_codons": 530,
+    "stop_codons": 463
+  },
+  "error_correction": {
+    "sample_size": 1000,
+    "corrected_count": 0,
+    "correction_rate": 0.0
+  },
+  "runtime_seconds": 2.0741
+}
